@@ -13,6 +13,9 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(DT)
+library(leaflet)
+library(sf)
+library(rnaturalearth)
 
 # Load data
 waw <- read_csv("data/WaW3.csv")
@@ -61,25 +64,77 @@ forecast_line$Value <- predict(
   newdata = forecast_line
 )
 
+# Natural Earth countries
+world <- ne_countries(
+  scale = "medium",
+  returnclass = "sf"
+)
+
+# Country centroids
+centroids <- st_centroid(world)
+
+coords <- st_coordinates(centroids)
+
+centroids$lon <- coords[,1]
+centroids$lat <- coords[,2]
+
+# 2050 MSW by country
+msw_2050 <- waw %>%
+  filter(
+    INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
+    UNIT_MEASURE_LABEL == "Tonnes per year"
+  ) %>%
+  select(
+    REF_AREA_LABEL,
+    `2050`
+  )
+
+# Join WaW to Natural Earth
+map_data <- centroids %>%
+  left_join(
+    msw_2050,
+    by = c("name" = "REF_AREA_LABEL")
+  )
+
 # User Interface
 ui <- fluidPage(
   
   titlePanel("What a Waste 3.0"),
   
-  h2("Global Municipal Solid Waste Generation"),
-  
-  selectInput(
-    "area",
-    "Country / Region",
-    choices = sort(unique(waw$REF_AREA_LABEL)),
-    selected = "Global"
-  ),
-  
-  plotOutput("trendChart", height = "500px"),
-  
-  hr(),
-  
-  DTOutput("dataTable")
+  tabsetPanel(
+    
+    tabPanel(
+      "Data Explorer",
+      
+      h2("Municipal Solid Waste Generation"),
+      
+      selectInput(
+        "area",
+        "Country / Region",
+        choices = sort(unique(waw$REF_AREA_LABEL)),
+        selected = "Global"
+      ),
+      
+      plotOutput("trendChart", height = "500px"),
+      
+      hr(),
+      
+      DTOutput("dataTable")
+    ),
+    
+    tabPanel(
+      "Map",
+      
+      h2("Map Explorer"),
+      
+      leafletOutput(
+        "map",
+        height = "700px"
+      )
+      
+    )
+    
+  )
   
 )
 
@@ -192,6 +247,40 @@ server <- function(input, output, session) {
       )
     )
 
+  })
+  
+  output$map <- renderLeaflet({
+    
+    leaflet(map_data) %>%
+      
+      addTiles() %>%
+      
+      addCircleMarkers(
+        lng = ~lon,
+        lat = ~lat,
+        
+        radius = ~sqrt(as.numeric(`2050`)) / 1000,
+        
+        popup = ~paste(
+          name,
+          "<br>",
+          format(
+            round(as.numeric(`2050`)),
+            big.mark = ","
+          ),
+          "tonnes"
+        ),
+        
+        stroke = FALSE,
+        fillOpacity = 0.7
+      ) %>%
+      
+      setView(
+        lng = 0,
+        lat = 20,
+        zoom = 2
+      )
+    
   })
 
 }
