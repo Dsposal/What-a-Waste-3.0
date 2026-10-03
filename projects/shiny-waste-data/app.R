@@ -8,44 +8,96 @@
 #
 
 library(shiny)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(DT)
 
-# Define UI for application that draws a histogram
-ui <- fluidPage(
+# Load data
+waw <- read_csv("data/WaW3.csv")
 
-    # Application title
-    titlePanel("Old Faithful Geyser Data"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-           plotOutput("distPlot")
-        )
+# Create global totals by year
+global_msw <- waw %>%
+  filter(
+    INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
+    UNIT_MEASURE_LABEL == "Tonnes per year"
+  ) %>%
+  summarise(
+    across(
+      matches("^\\d{4}$"),
+      ~ sum(as.numeric(.), na.rm = TRUE)
     )
+  )
+
+# Convert to Year/Value format for charting
+global_msw_long <- global_msw %>%
+  pivot_longer(
+    everything(),
+    names_to = "Year",
+    values_to = "Value"
+  ) %>%
+  mutate(
+    Year = as.numeric(Year)
+  ) %>%
+  arrange(Year)
+
+# User Interface
+ui <- fluidPage(
+  
+  titlePanel("What a Waste 3.0"),
+  
+  h2("Global Municipal Solid Waste Generation"),
+  
+  selectInput(
+    "area",
+    "Country / Region",
+    choices = sort(unique(waw$REF_AREA_LABEL)),
+    selected = "Global"
+  ),
+  
+  plotOutput("trendChart", height = "500px"),
+  
+  hr(),
+  
+  DTOutput("dataTable")
+  
 )
 
-# Define server logic required to draw a histogram
-server <- function(input, output) {
-
-    output$distPlot <- renderPlot({
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
-
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white',
-             xlab = 'Waiting time to next eruption (in mins)',
-             main = 'Histogram of waiting times')
-    })
+# Server
+server <- function(input, output, session) {
+  
+  output$trendChart <- renderPlot({
+    
+    ggplot(
+      global_msw_long,
+      aes(
+        x = Year,
+        y = Value
+      )
+    ) +
+      geom_line(linewidth = 1.2, colour = "#0072B2") +
+      geom_point(colour = "#0072B2") +
+      labs(
+        x = "Year",
+        y = "Tonnes per year",
+        title = "Global Municipal Solid Waste Generation"
+      ) +
+      theme_minimal()
+    
+  })
+  
+  output$dataTable <- renderDT({
+    
+    datatable(
+      global_msw_long,
+      options = list(
+        pageLength = 20
+      )
+    )
+    
+  })
+  
 }
 
-# Run the application 
-shinyApp(ui = ui, server = server)
+shinyApp(ui, server)
