@@ -16,6 +16,7 @@ library(DT)
 library(leaflet)
 library(sf)
 library(rnaturalearth)
+library(cartogram)
 
 # Load data
 waw <- read_csv("data/WaW3.csv")
@@ -208,6 +209,19 @@ ui <- fluidPage(
         height = "700px"
       )
       
+    ),
+    
+    tabPanel(
+      
+      "Cartogram",
+      
+      h2("Dorling Cartogram"),
+      
+      plotOutput(
+        "dorlingPlot",
+        height = "700px"
+      )
+      
     )
     
   )
@@ -385,6 +399,50 @@ server <- function(input, output, session) {
     
   })
 
+  output$dorlingPlot <- renderPlot({
+    
+    msw <- waw_clean %>%
+      filter(
+        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
+        UNIT_MEASURE_LABEL == "Tonnes per year"
+      ) %>%
+      mutate(
+        value = as.numeric(`2030`)
+      ) %>%
+      select(
+        country_name,
+        value
+      )
+    
+    world_msw <- world %>%
+      left_join(
+        msw,
+        by = c("name" = "country_name")
+      )
+    
+    world_msw_proj <- st_transform(
+      world_msw,
+      3857
+    )
+    
+    world_msw_dorling <- world_msw_proj %>%
+      filter(
+        !is.na(value),
+        value > 0
+      )
+    
+    dorling <- cartogram_dorling(
+      world_msw_dorling,
+      weight = "value"
+    )
+    
+    plot(
+      dorling["value"],
+      main = "Municipal Solid Waste Generation (2030)"
+    )
+    
+  })
+  
 }
 
 shinyApp(ui, server)
