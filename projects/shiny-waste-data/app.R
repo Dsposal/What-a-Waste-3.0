@@ -42,6 +42,25 @@ global_msw_long <- global_msw %>%
   ) %>%
   arrange(Year)
 
+# Build a simple forecast trend from trusted points
+trusted_points <- global_msw_long %>%
+  filter(Year %in% c(2022, 2030, 2040, 2050))
+
+forecast_model <- lm(Value ~ Year, data = trusted_points)
+
+forecast_line <- data.frame(
+  Year = seq(
+    min(global_msw_long$Year),
+    max(global_msw_long$Year),
+    by = 1
+  )
+)
+
+forecast_line$Value <- predict(
+  forecast_model,
+  newdata = forecast_line
+)
+
 # User Interface
 ui <- fluidPage(
   
@@ -65,39 +84,116 @@ ui <- fluidPage(
 )
 
 # Server
+
 server <- function(input, output, session) {
-  
+
+  filtered_msw <- reactive({
+
+    waw %>%
+      filter(
+        REF_AREA_LABEL == input$area,
+        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
+        UNIT_MEASURE_LABEL == "Tonnes per year"
+      ) %>%
+      summarise(
+        across(
+          matches("^\\d{4}$"),
+          ~ sum(as.numeric(.), na.rm = TRUE)
+        )
+      ) %>%
+      pivot_longer(
+        everything(),
+        names_to = "Year",
+        values_to = "Value"
+      ) %>%
+      mutate(
+        Year = as.numeric(Year)
+      ) %>%
+      arrange(Year)
+
+  })
+
   output$trendChart <- renderPlot({
-    
-    ggplot(
-      global_msw_long,
-      aes(
-        x = Year,
-        y = Value
+
+    # Build forecast line for selected area
+    trusted_points <- filtered_msw() %>%
+      filter(Year %in% c(2022, 2030, 2040, 2050))
+
+    forecast_model <- lm(
+      Value ~ Year,
+      data = trusted_points
+    )
+
+    forecast_line <- data.frame(
+      Year = seq(
+        min(filtered_msw()$Year),
+        max(filtered_msw()$Year),
+        by = 1
       )
-    ) +
-      geom_line(linewidth = 1.2, colour = "#0072B2") +
-      geom_point(colour = "#0072B2") +
+    )
+
+    forecast_line$Value <- predict(
+      forecast_model,
+      newdata = forecast_line
+    )
+
+    ggplot() +
+
+      geom_line(
+        data = filtered_msw(),
+        aes(
+          x = Year,
+          y = Value
+        ),
+        linewidth = 1.2,
+        colour = "#0072B2"
+      ) +
+
+      geom_point(
+        data = filtered_msw(),
+        aes(
+          x = Year,
+          y = Value
+        ),
+        colour = "#0072B2"
+      ) +
+
+      geom_line(
+        data = forecast_line,
+        aes(
+          x = Year,
+          y = Value
+        ),
+        colour = "#D55E00",
+        linewidth = 1.5,
+        linetype = "dashed"
+      ) +
+
       labs(
         x = "Year",
         y = "Tonnes per year",
-        title = "Global Municipal Solid Waste Generation"
+        title = paste(
+          input$area,
+          "Municipal Solid Waste Generation"
+        )
       ) +
+
       theme_minimal()
-    
+
   })
-  
+
   output$dataTable <- renderDT({
-    
+
     datatable(
-      global_msw_long,
+      filtered_msw(),
       options = list(
-        pageLength = 20
+        pageLength = 20,
+        order = list(list(1, 'desc'))
       )
     )
-    
+
   })
-  
+
 }
 
 shinyApp(ui, server)

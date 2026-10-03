@@ -1,7 +1,7 @@
 library(tidyverse)
 library(tidyr)
 
-waw <- read_csv("data/waw3.csv")
+waw <- read_csv("data/WaW3.csv")
 
 waw_long <- waw %>%
   pivot_longer(
