@@ -15,7 +15,7 @@ library(ggplot2)
 library(DT)
 
 # Load data
-waw <- read_csv("data/waw3.csv")
+waw <- read_csv("data/WaW3.csv")
 
 # Create global totals by year
 global_msw <- waw %>%
