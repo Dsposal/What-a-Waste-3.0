@@ -64,6 +64,73 @@ forecast_line$Value <- predict(
   newdata = forecast_line
 )
 
+mapYears <- c(
+  "2021",
+  "2022",
+  "2030",
+  "2040",
+  "2050"
+)
+
+country_lookup <- data.frame(
+  REF_AREA_LABEL = c(
+    "United States",
+    "Russian Federation",
+    "Viet Nam",
+    "Turkiye",
+    "Korea, Rep.",
+    "Egypt, Arab Rep.",
+    "Iran, Islamic Rep.",
+    "Lao PDR",
+    "Slovak Republic",
+    "Venezuela, RB",
+    "Congo, Dem. Rep.",
+    "Congo, Rep.",
+    "Gambia, The",
+    "Bahamas, The",
+    "Yemen, Rep.",
+    "Brunei Darussalam",
+    "Cote d'Ivoire",
+    "Syrian Arab Republic",
+    "Kyrgyz Republic"
+  ),
+  NE_NAME = c(
+    "United States of America",
+    "Russia",
+    "Vietnam",
+    "Turkey",
+    "South Korea",
+    "Egypt",
+    "Iran",
+    "Laos",
+    "Slovakia",
+    "Venezuela",
+    "Democratic Republic of the Congo",
+    "Republic of the Congo",
+    "Gambia",
+    "Bahamas",
+    "Yemen",
+    "Brunei",
+    "Ivory Coast",
+    "Syria",
+    "Kyrgyzstan"
+  ),
+  stringsAsFactors = FALSE
+)
+
+waw_clean <- waw %>%
+  left_join(
+    country_lookup,
+    by = "REF_AREA_LABEL"
+  ) %>%
+  mutate(
+    country_name = ifelse(
+      is.na(NE_NAME),
+      REF_AREA_LABEL,
+      NE_NAME
+    )
+  )
+
 # Natural Earth countries
 world <- ne_countries(
   scale = "medium",
@@ -87,13 +154,6 @@ msw_2050 <- waw %>%
   select(
     REF_AREA_LABEL,
     `2050`
-  )
-
-# Join WaW to Natural Earth
-map_data <- centroids %>%
-  left_join(
-    msw_2050,
-    by = c("name" = "REF_AREA_LABEL")
   )
 
 # User Interface
@@ -125,7 +185,23 @@ ui <- fluidPage(
     tabPanel(
       "Map",
       
-      h2("Map Explorer"),
+      h2("Municipal Solid Waste Generation by Country"),
+      
+      selectInput(
+        "mapYear",
+        "Year",
+        choices = mapYears,
+        selected = "2030"
+      ),
+      
+      sliderInput(
+        "bubbleScale",
+        "Bubble Scale",
+        min = 150,
+        max = 1250,
+        value = 475,
+        step = 25
+      ),
       
       leafletOutput(
         "map",
@@ -142,6 +218,30 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
+  map_data <- reactive({
+    
+    msw <- waw_clean %>%
+      filter(
+        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
+        UNIT_MEASURE_LABEL == "Tonnes per year"
+      ) %>%
+      mutate(
+        value = as.numeric(.data[[input$mapYear]])
+      ) %>%
+      select(
+        country_name,
+        value
+      )
+    
+    centroids %>%
+      left_join(
+        msw,
+        by = c("name" = "country_name")
+      )
+    
+  })
+  
+  
   filtered_msw <- reactive({
 
     waw %>%
@@ -251,7 +351,7 @@ server <- function(input, output, session) {
   
   output$map <- renderLeaflet({
     
-    leaflet(map_data) %>%
+    leaflet(map_data()) %>%
       
       addTiles() %>%
       
@@ -259,16 +359,18 @@ server <- function(input, output, session) {
         lng = ~lon,
         lat = ~lat,
         
-        radius = ~sqrt(as.numeric(`2050`)) / 1000,
+        radius = ~sqrt(as.numeric(value)) / input$bubbleScale,
         
         popup = ~paste(
-          name,
+          "<b>", name, "</b>",
           "<br>",
+          input$mapYear,
+          ": ",
           format(
-            round(as.numeric(`2050`)),
+            round(as.numeric(value)),
             big.mark = ","
           ),
-          "tonnes"
+          " tonnes"
         ),
         
         stroke = FALSE,
