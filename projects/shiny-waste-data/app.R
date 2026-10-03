@@ -13,6 +13,7 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(DT)
+library(leaflet)
 
 # Load data
 waw <- read_csv("data/WaW3.csv")
@@ -66,20 +67,40 @@ ui <- fluidPage(
   
   titlePanel("What a Waste 3.0"),
   
-  h2("Global Municipal Solid Waste Generation"),
-  
-  selectInput(
-    "area",
-    "Country / Region",
-    choices = sort(unique(waw$REF_AREA_LABEL)),
-    selected = "Global"
-  ),
-  
-  plotOutput("trendChart", height = "500px"),
-  
-  hr(),
-  
-  DTOutput("dataTable")
+  tabsetPanel(
+    
+    tabPanel(
+      "Data Explorer",
+      
+      h2("Municipal Solid Waste Generation"),
+      
+      selectInput(
+        "area",
+        "Country / Region",
+        choices = sort(unique(waw$REF_AREA_LABEL)),
+        selected = "Global"
+      ),
+      
+      plotOutput("trendChart", height = "500px"),
+      
+      hr(),
+      
+      DTOutput("dataTable")
+    ),
+    
+    tabPanel(
+      "Map",
+      
+      h2("Map Explorer"),
+      
+      leafletOutput(
+        "map",
+        height = "700px"
+      )
+      
+    )
+    
+  )
   
 )
 
@@ -192,6 +213,18 @@ server <- function(input, output, session) {
       )
     )
 
+  })
+  
+  output$map <- renderLeaflet({
+    
+    leaflet() %>%
+      addTiles() %>%
+      setView(
+        lng = 0,
+        lat = 20,
+        zoom = 2
+      )
+    
   })
 
 }
