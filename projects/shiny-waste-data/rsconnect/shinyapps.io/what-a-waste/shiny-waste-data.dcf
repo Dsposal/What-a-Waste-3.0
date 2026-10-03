@@ -1,0 +1,12 @@
+name: shiny-waste-data
+title: shiny-waste-data
+username: what-a-waste
+account: what-a-waste
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 18080822
+bundleId: 12642020
+url: https://what-a-waste.shinyapps.io/shiny-waste-data/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
