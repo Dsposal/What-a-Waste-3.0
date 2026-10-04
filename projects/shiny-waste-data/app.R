@@ -1,11 +1,41 @@
+############################################################
+# WHAT A WASTE 3.0
 #
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
+# PURPOSE
+# -------
+# Main Shiny application entry point.
 #
-# Find out more about building applications with Shiny here:
+# RESPONSIBILITIES
+# ----------------
+# - Load libraries
+# - Load datasets and reference data
+# - Load tab definitions
+# - Define UI
+# - Define server logic
 #
-#    https://shiny.posit.co/
+# RELATED FILES
+# -------------
+# R/data.R
+# R/lookups.R
+# R/geography.R
 #
+# ui/home_tab.R
+# ui/data_explorer_tab.R
+# ui/map_tab.R
+# ui/cartogram_tab.R
+#
+# AI NOTES
+# --------
+# UI tab definitions should live in ui/*.
+#
+# Country cleaning should live in R/lookups.R.
+#
+# Natural Earth and sf spatial logic should live in
+# R/geography.R.
+#
+# Avoid adding large data preparation logic directly
+# into app.R.
+############################################################
 
 library(shiny)
 library(readr)
@@ -19,147 +49,17 @@ library(rnaturalearth)
 library(cartogram)
 
 # Load files
-# Data first then tabs
+# Data first
 source("R/data.R")
 source("R/lookups.R")
 source("R/geography.R")
 
+# Then load tabs
 source("ui/home_tab.R")
 source("ui/data_explorer_tab.R")
 source("ui/map_tab.R")
 source("ui/cartogram_tab.R")
 
-
-# Load data
-waw <- read_csv("data/WaW3.csv")
-
-# Create global totals by year
-global_msw <- waw %>%
-  filter(
-    INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-    UNIT_MEASURE_LABEL == "Tonnes per year"
-  ) %>%
-  summarise(
-    across(
-      matches("^\\d{4}$"),
-      ~ sum(as.numeric(.), na.rm = TRUE)
-    )
-  )
-
-# Convert to Year/Value format for charting
-global_msw_long <- global_msw %>%
-  pivot_longer(
-    everything(),
-    names_to = "Year",
-    values_to = "Value"
-  ) %>%
-  mutate(
-    Year = as.numeric(Year)
-  ) %>%
-  arrange(Year)
-
-# Build a simple forecast trend from trusted points
-trusted_points <- global_msw_long %>%
-  filter(Year %in% c(2022, 2030, 2040, 2050))
-
-forecast_model <- lm(Value ~ Year, data = trusted_points)
-
-forecast_line <- data.frame(
-  Year = seq(
-    min(global_msw_long$Year),
-    max(global_msw_long$Year),
-    by = 1
-  )
-)
-
-forecast_line$Value <- predict(
-  forecast_model,
-  newdata = forecast_line
-)
-
-country_lookup <- data.frame(
-  REF_AREA_LABEL = c(
-    "United States",
-    "Russian Federation",
-    "Viet Nam",
-    "Turkiye",
-    "Korea, Rep.",
-    "Egypt, Arab Rep.",
-    "Iran, Islamic Rep.",
-    "Lao PDR",
-    "Slovak Republic",
-    "Venezuela, RB",
-    "Congo, Dem. Rep.",
-    "Congo, Rep.",
-    "Gambia, The",
-    "Bahamas, The",
-    "Yemen, Rep.",
-    "Brunei Darussalam",
-    "Cote d'Ivoire",
-    "Syrian Arab Republic",
-    "Kyrgyz Republic"
-  ),
-  NE_NAME = c(
-    "United States of America",
-    "Russia",
-    "Vietnam",
-    "Turkey",
-    "South Korea",
-    "Egypt",
-    "Iran",
-    "Laos",
-    "Slovakia",
-    "Venezuela",
-    "Democratic Republic of the Congo",
-    "Republic of the Congo",
-    "Gambia",
-    "Bahamas",
-    "Yemen",
-    "Brunei",
-    "Ivory Coast",
-    "Syria",
-    "Kyrgyzstan"
-  ),
-  stringsAsFactors = FALSE
-)
-
-waw_clean <- waw %>%
-  left_join(
-    country_lookup,
-    by = "REF_AREA_LABEL"
-  ) %>%
-  mutate(
-    country_name = ifelse(
-      is.na(NE_NAME),
-      REF_AREA_LABEL,
-      NE_NAME
-    )
-  )
-
-# Natural Earth countries
-world <- ne_countries(
-  scale = "medium",
-  returnclass = "sf"
-)
-
-# Country centroids
-centroids <- st_centroid(world)
-
-coords <- st_coordinates(centroids)
-
-centroids$lon <- coords[,1]
-centroids$lat <- coords[,2]
-
-# 2050 MSW by country
-msw_2050 <- waw %>%
-  filter(
-    INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-    UNIT_MEASURE_LABEL == "Tonnes per year"
-  ) %>%
-  select(
-    REF_AREA_LABEL,
-    `2050`
-  )
 
 # User Interface
 ui <- fluidPage(
@@ -181,6 +81,19 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
+  # Build country-level map data for the selected year.
+  #
+  # Users select:
+  #   2021
+  #   2022
+  #   2030
+  #   2040
+  #   2050
+  #
+  # The selected year is converted into a generic 'value'
+  # column so that the mapping code remains independent
+  # of the underlying year.
+  
   map_data <- reactive({
     
     msw <- waw_clean %>%
@@ -348,6 +261,33 @@ server <- function(input, output, session) {
     
   })
 
+  ############################################################
+  # DORLING CARTOGRAM
+  #
+  # PURPOSE
+  # -------
+  # Visualise waste metrics using circle sizes rather
+  # than geographic area.
+  #
+  # PROCESS
+  # -------
+  # WaW Data
+  #   -> Country Normalisation
+  #   -> Natural Earth Join
+  #   -> Projection
+  #   -> Cartogram Generation
+  #
+  # AI NOTES
+  # --------
+  # Cartograms require projected geometries.
+  #
+  # If errors mention longitude/latitude, check
+  # st_transform().
+  #
+  # Missing bubbles are usually caused by failed country
+  # name joins or missing values.
+  ############################################################
+  
   output$dorlingPlot <- renderPlot({
     
     msw <- waw_clean %>%
