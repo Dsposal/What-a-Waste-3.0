@@ -5,7 +5,7 @@ account: what-a-waste
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 18080822
-bundleId: 12642661
+bundleId: 12642742
 url: https://what-a-waste.shinyapps.io/shiny-waste-data/
 version: 1
 asMultiple: FALSE
