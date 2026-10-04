@@ -104,12 +104,13 @@ server <- function(input, output, session) {
       mutate(
         value = as.numeric(.data[[input$mapYear]])
       ) %>%
-      select(
-        country_name,
-        value
+      group_by(country_name) %>%
+      summarise(
+        value = first(na.omit(value)),
+        .groups = "drop"
       )
     
-    centroids %>%
+    world %>%
       left_join(
         msw,
         by = c("name" = "country_name")
@@ -227,15 +228,72 @@ server <- function(input, output, session) {
   
   output$map <- renderLeaflet({
     
-    leaflet(map_data()) %>%
+    map_df <- map_data()
+    
+    print(input$mapScale)
+    
+    values <- map_df$value
+    
+    if (input$mapScale == "Natural") {
+      
+      map_df$display_value <- map_df$value
+      
+      pal <- colorNumeric(
+        palette = input$mapPalette,
+        domain = map_df$display_value,
+        na.color = "#d3d3d3"
+      )
+      
+    } else if (input$mapScale == "Logarithmic") {
+      
+      map_df$display_value <- ifelse(
+        map_df$value > 0,
+        log10(map_df$value),
+        NA
+      )
+      
+      pal <- colorNumeric(
+        palette = input$mapPalette,
+        domain = map_df$display_value,
+        na.color = "#d3d3d3"
+      )
+      
+    } else if (input$mapScale == "Quantiles") {
+      
+      map_df$display_value <- map_df$value
+      
+      pal <- colorQuantile(
+        palette = input$mapPalette,
+        domain = map_df$display_value,
+        n = 7,
+        na.color = "#d3d3d3"
+      )
+      
+    } else if (input$mapScale == "Percentile") {
+      
+      map_df$display_value <- percent_rank(map_df$value)
+      
+      pal <- colorNumeric(
+        palette = input$mapPalette,
+        domain = c(0, 1),
+        na.color = "#d3d3d3"
+      )
+      
+    }
+    
+    leaflet(map_df) %>%
       
       addTiles() %>%
       
-      addCircleMarkers(
-        lng = ~lon,
-        lat = ~lat,
+      addPolygons(
         
-        radius = ~sqrt(as.numeric(value)) / input$bubbleScale,
+        fillColor = ~pal(display_value),
+        
+        fillOpacity = 0.8,
+        
+        color = "#666666",
+        
+        weight = 0.5,
         
         popup = ~paste(
           "<b>", name, "</b>",
@@ -247,10 +305,18 @@ server <- function(input, output, session) {
             big.mark = ","
           ),
           " tonnes"
-        ),
-        
-        stroke = FALSE,
-        fillOpacity = 0.7
+        )
+      ) %>%
+      
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = map_df$display_value,
+        title = paste(
+          input$mapScale,
+          "-",
+          input$mapYear
+        )
       ) %>%
       
       setView(
