@@ -83,3 +83,28 @@ waw_clean <- waw %>%
       NE_NAME
     )
   )
+
+
+# Country codes for map joins.
+#
+# Maps join on the ISO3 code (REF_AREA) rather than on
+# names, because names differ in many small ways between
+# the World Bank and Natural Earth (32 countries failed
+# to match by name). Natural Earth's adm0_a3 column uses
+# standard ISO3 codes except for the three below.
+#
+# Gibraltar and the Channel Islands have no shape in the
+# medium-scale Natural Earth map, so they cannot appear.
+ne_code_lookup <- c(
+  SSD = "SDS",  # South Sudan
+  PSE = "PSX",  # West Bank and Gaza
+  XKX = "KOS"   # Kosovo
+)
+
+waw_clean <- waw_clean %>%
+  mutate(
+    map_code = coalesce(
+      unname(ne_code_lookup[REF_AREA]),
+      REF_AREA
+    )
+  )

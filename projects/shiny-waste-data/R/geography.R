@@ -31,7 +31,12 @@ world <- ne_countries(
 )
 
 # Country centroids
-centroids <- st_centroid(world)
+#
+# of_largest_polygon = TRUE places each point on the
+# country's largest landmass. Without it, overseas
+# territories drag the point away, e.g. French Guiana
+# pulls France into Spain and Alaska/Hawaii move the US.
+centroids <- st_centroid(world, of_largest_polygon = TRUE)
 
 coords <- st_coordinates(centroids)
 

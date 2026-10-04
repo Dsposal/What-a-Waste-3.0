@@ -111,9 +111,22 @@ server <- function(input, output, session) {
       )
     
     world %>%
+      # Each country has several rows (measured value,
+      # 2022 baseline, projections), and only one holds
+      # a value for any given year. Keep that one.
+      filter(
+        !is.na(value)
+      ) %>%
+      select(
+        map_code,
+        value
+      )
+
+    # Join on country code, not name (see R/lookups.R)
+    centroids %>%
       left_join(
         msw,
-        by = c("name" = "country_name")
+        by = c("adm0_a3" = "map_code")
       )
     
   })
@@ -364,15 +377,19 @@ server <- function(input, output, session) {
       mutate(
         value = as.numeric(`2030`)
       ) %>%
+      filter(
+        !is.na(value)
+      ) %>%
       select(
-        country_name,
+        map_code,
         value
       )
-    
+
+    # Join on country code, not name (see R/lookups.R)
     world_msw <- world %>%
       left_join(
         msw,
-        by = c("name" = "country_name")
+        by = c("adm0_a3" = "map_code")
       )
     
     world_msw_proj <- st_transform(
