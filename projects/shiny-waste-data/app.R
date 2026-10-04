@@ -18,6 +18,18 @@ library(sf)
 library(rnaturalearth)
 library(cartogram)
 
+# Load files
+# Data first then tabs
+source("R/data.R")
+source("R/lookups.R")
+source("R/geography.R")
+
+source("ui/home_tab.R")
+source("ui/data_explorer_tab.R")
+source("ui/map_tab.R")
+source("ui/cartogram_tab.R")
+
+
 # Load data
 waw <- read_csv("data/WaW3.csv")
 
@@ -63,14 +75,6 @@ forecast_line <- data.frame(
 forecast_line$Value <- predict(
   forecast_model,
   newdata = forecast_line
-)
-
-mapYears <- c(
-  "2021",
-  "2022",
-  "2030",
-  "2040",
-  "2050"
 )
 
 country_lookup <- data.frame(
@@ -164,65 +168,10 @@ ui <- fluidPage(
   
   tabsetPanel(
     
-    tabPanel(
-      "Data Explorer",
-      
-      h2("Municipal Solid Waste Generation"),
-      
-      selectInput(
-        "area",
-        "Country / Region",
-        choices = sort(unique(waw$REF_AREA_LABEL)),
-        selected = "Global"
-      ),
-      
-      plotOutput("trendChart", height = "500px"),
-      
-      hr(),
-      
-      DTOutput("dataTable")
-    ),
-    
-    tabPanel(
-      "Map",
-      
-      h2("Municipal Solid Waste Generation by Country"),
-      
-      selectInput(
-        "mapYear",
-        "Year",
-        choices = mapYears,
-        selected = "2030"
-      ),
-      
-      sliderInput(
-        "bubbleScale",
-        "Bubble Scale",
-        min = 150,
-        max = 1250,
-        value = 475,
-        step = 25
-      ),
-      
-      leafletOutput(
-        "map",
-        height = "700px"
-      )
-      
-    ),
-    
-    tabPanel(
-      
-      "Cartogram",
-      
-      h2("Dorling Cartogram"),
-      
-      plotOutput(
-        "dorlingPlot",
-        height = "700px"
-      )
-      
-    )
+    homeTab,
+    dataExplorerTab,
+    mapTab,
+    cartogramTab
     
   )
   
@@ -404,7 +353,7 @@ server <- function(input, output, session) {
     msw <- waw_clean %>%
       filter(
         INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-        UNIT_MEASURE_LABEL == "Tonnes per year"
+        UNIT_MEASURE_LABEL == input$cartogramUnit
       ) %>%
       mutate(
         value = as.numeric(`2030`)
