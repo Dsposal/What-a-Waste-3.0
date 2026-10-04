@@ -11,13 +11,29 @@ mapTab <- tabPanel(
     selected = "2030"
   ),
   
-  sliderInput(
-    "bubbleScale",
-    "Bubble Scale",
-    min = 150,
-    max = 1250,
-    value = 475,
-    step = 25
+  selectInput(
+    "mapPalette",
+    "Colour Palette",
+    choices = c(
+      "viridis",
+      "magma",
+      "plasma",
+      "inferno",
+      "cividis"
+    ),
+    selected = "viridis"
+  ),
+  
+  selectInput(
+    "mapScale",
+    "Scale Method",
+    choices = c(
+      "Natural",
+      "Logarithmic",
+      "Quantiles",
+      "Percentile"
+    ),
+    selected = "Natural"
   ),
   
   leafletOutput(
