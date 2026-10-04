@@ -21,7 +21,8 @@
 #
 # The REF_AREA_LABEL field is used as the country key
 # throughout the application.
-waw <- read_csv("data/WaW3.csv")
+
+waw <- readr::read_csv("data/WaW3.csv")
 
 # Create global totals by year
 global_msw <- waw %>%
