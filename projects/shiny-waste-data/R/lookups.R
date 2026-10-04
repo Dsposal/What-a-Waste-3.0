@@ -18,6 +18,9 @@
 # rather than modifying the source data.
 ############################################################
 
+library(dplyr)
+
+
 # Manual corrections required for country joins.
 #
 # Kept explicit rather than using fuzzy matching so that

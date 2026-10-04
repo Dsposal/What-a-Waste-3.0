@@ -21,6 +21,8 @@
 # intentionally moving to a choropleth map.
 ############################################################
 
+library(sf)
+library(rnaturalearth)
 
 # Natural Earth countries
 world <- ne_countries(

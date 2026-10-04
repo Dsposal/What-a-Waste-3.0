@@ -10,6 +10,9 @@
 # No UI or visualisation logic should be placed here.
 ############################################################
 
+library(readr)
+library(dplyr)
+library(tidyr)
 
 # Main What a Waste 3.0 dataset
 #
