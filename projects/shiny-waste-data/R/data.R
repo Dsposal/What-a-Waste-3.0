@@ -52,6 +52,25 @@ global_msw_long <- global_msw %>%
   ) %>%
   arrange(Year)
 
+# 2022 population per country. The dataset has no population
+# column, but it is implied by the two generation units:
+# tonnes / (kg per person per day * 365). Used to keep small
+# territories out of per person rankings and medians.
+country_population <- waw %>%
+  filter(
+    INDICATOR == "WM_MSW_GEN",
+    UNIT_MEASURE %in% c("T_YR", "KG_PS_D"),
+    !is.na(`2022`)
+  ) %>%
+  group_by(REF_AREA) %>%
+  summarise(
+    tonnes = first(as.numeric(`2022`[UNIT_MEASURE == "T_YR"])),
+    kg = first(as.numeric(`2022`[UNIT_MEASURE == "KG_PS_D"])),
+    .groups = "drop"
+  ) %>%
+  mutate(population = tonnes * 1000 / (kg * 365)) %>%
+  select(REF_AREA, population)
+
 # The maps don't need all years because not all the data is in
 mapYears <- c(
   "2021",
