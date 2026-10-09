@@ -77,19 +77,6 @@ race_points <- waw %>%
     .groups = "drop"
   )
 
-# Population is implied by the two units:
-# tonnes / (kg per person per day * 365). Used only to keep
-# small territories out of the per person ranking.
-race_population <- race_points %>%
-  filter(year == 2022) %>%
-  select(REF_AREA, unit, value) %>%
-  pivot_wider(names_from = unit, values_from = value) %>%
-  mutate(
-    population = `Tonnes per year` * 1000 /
-      (`Kilograms per person per day` * 365)
-  ) %>%
-  select(REF_AREA, population)
-
 # Every year from 2022 to 2050, interpolated in between
 race_years <- seq(2022, 2050)
 
@@ -100,7 +87,9 @@ race_frames <- race_points %>%
     value = approx(year, value, xout = race_years)$y,
     year = race_years
   ) %>%
-  left_join(race_population, by = "REF_AREA")
+  # Population (R/data.R) keeps small territories out of the
+  # per person ranking
+  left_join(country_population, by = "REF_AREA")
 
 
 # Animated chart. Each year is a plotly frame and the y axis
