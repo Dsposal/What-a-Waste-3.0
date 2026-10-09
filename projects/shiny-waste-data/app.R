@@ -18,11 +18,13 @@
 # R/data.R
 # R/lookups.R
 # R/geography.R
+# R/race.R
 #
 # ui/home_tab.R
 # ui/data_explorer_tab.R
 # ui/map_tab.R
 # ui/cartogram_tab.R
+# ui/race_tab.R
 #
 # AI NOTES
 # --------
@@ -47,18 +49,21 @@ library(leaflet)
 library(sf)
 library(rnaturalearth)
 library(cartogram)
+library(plotly)
 
 # Load files
 # Data first
 source("R/data.R")
 source("R/lookups.R")
 source("R/geography.R")
+source("R/race.R")
 
 # Then load tabs
 source("ui/home_tab.R")
 source("ui/data_explorer_tab.R")
 source("ui/map_tab.R")
 source("ui/cartogram_tab.R")
+source("ui/race_tab.R")
 
 
 # User Interface
@@ -71,7 +76,8 @@ ui <- fluidPage(
     homeTab,
     dataExplorerTab,
     mapTab,
-    cartogramTab
+    cartogramTab,
+    raceTab
     
   )
   
@@ -405,6 +411,36 @@ server <- function(input, output, session) {
     
   })
   
+  ############################################################
+  # COUNTRY RACE
+  #
+  # The chart is built in R/race.R.
+  ############################################################
+
+  race_unit_data <- reactive({
+
+    df <- race_frames %>%
+      filter(unit == input$raceUnit)
+
+    # Per person: skip small territories (see R/race.R)
+    if (input$raceUnit == "Kilograms per person per day") {
+      df <- df %>% filter(population >= 1e6)
+    }
+
+    df
+
+  })
+
+  output$racePlot <- renderPlotly({
+
+    race_plot(
+      race_unit_data(),
+      top_n = as.numeric(input$raceTop),
+      is_tonnes = input$raceUnit == "Tonnes per year"
+    )
+
+  })
+
 }
 
 shinyApp(ui, server)
