@@ -245,6 +245,7 @@ server <- function(input, output, session) {
     map_df <- map_data()
     
     print(input$mapScale)
+    print(nrow(map_df))
     
     values <- map_df$value
     
@@ -411,9 +412,38 @@ server <- function(input, output, session) {
     )
     
     plot(
-      dorling["value"],
+      st_geometry(dorling),
+      col = "lightblue",
+      border = "black",
       main = "Municipal Solid Waste Generation (2030)"
     )
+    
+    print(par("usr"))
+    
+    top_labels <- dorling %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
+    top_labels$name[top_labels$name == "United States of America"] <- "USA"
+    
+    coords <- st_coordinates(st_point_on_surface(top_labels))
+    
+    text(
+      coords[,1],
+      coords[,2],
+      labels = top_labels$name,
+      cex = 0.7,
+      col = "black"
+    )
+    
+    print(
+      data.frame(
+        country = top_labels$name,
+        x = coords[,1],
+        y = coords[,2]
+      )
+    )
+    
     
   })
   
