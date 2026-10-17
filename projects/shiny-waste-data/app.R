@@ -245,6 +245,7 @@ server <- function(input, output, session) {
     map_df <- map_data()
     
     print(input$mapScale)
+    print(nrow(map_df))
     
     values <- map_df$value
     
@@ -381,9 +382,10 @@ server <- function(input, output, session) {
       filter(
         !is.na(value)
       ) %>%
-      select(
-        map_code,
-        value
+      group_by(map_code) %>%
+      summarise(
+        value = first(na.omit(value)),
+        .groups = "drop"
       )
 
     # Join on country code, not name (see R/lookups.R)
@@ -404,14 +406,157 @@ server <- function(input, output, session) {
         value > 0
       )
     
+    msw_tonnes <- waw_clean %>%
+      filter(
+        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
+        UNIT_MEASURE_LABEL == "Tonnes per year"
+      ) %>%
+      mutate(
+        value = as.numeric(`2030`)
+      ) %>%
+      filter(
+        !is.na(value)
+      ) %>%
+      group_by(map_code) %>%
+      summarise(
+        value = first(na.omit(value)),
+        .groups = "drop"
+      )
+    
+    msw_per_capita <- waw_clean %>%
+      filter(
+        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
+        UNIT_MEASURE_LABEL == "Kilograms per person per day"
+      ) %>%
+      mutate(
+        value = as.numeric(`2030`)
+      ) %>%
+      filter(
+        !is.na(value)
+      ) %>%
+      group_by(map_code) %>%
+      summarise(
+        value = first(na.omit(value)),
+        .groups = "drop"
+      )
+    
+    top5_tonnes <- msw_tonnes %>%
+      filter(!is.na(value)) %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
+    top5_current <- world_msw_dorling %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
+    top5_per_capita <- msw_per_capita %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
+    cat("\n====================================\n")
+    cat("Current measure:\n")
+    cat(input$cartogramUnit, "\n\n")
+    
+    cat("Top 5 CURRENT\n")
+    print(top5_current$name)
+    
+    cat("\nTop 5 TONNES\n")
+    print(top5_tonnes)
+    
+    cat("\nTop 5 PER CAPITA\n")
+    print(top5_per_capita$map_code)
+    
+    cat("====================================\n")
+    
     dorling <- cartogram_dorling(
       world_msw_dorling,
       weight = "value"
     )
     
+    dorling$group <- "Other"
+    
+    dorling$group[
+      dorling$adm0_a3 %in% top5_tonnes$map_code
+    ] <- "Tonnes"
+    
+    dorling$group[
+      dorling$adm0_a3 %in% top5_per_capita$map_code
+    ] <- "Per Capita"
+    
+    top5 <- dorling %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
+    dorling$fill_colour <- case_when(
+      dorling$group == "Tonnes" ~ "#4E79A7",
+      dorling$group == "Per Capita" ~ "#F28E2B",
+      TRUE ~ "#D9D9D9"
+    )
+    
     plot(
-      dorling["value"],
-      main = "Municipal Solid Waste Generation (2030)"
+      st_geometry(dorling),
+      col = dorling$fill_colour,
+      border = "black",
+      main = paste(
+        "Global Waste Generation: Absolute vs Per-Person Leaders (2030)\n",
+        input$cartogramUnit
+      )
+      
+    )
+    
+    legend(
+      "topright",
+      legend = c(
+        "Top 5 Total Waste (Tonnes)",
+        "Top 5 Waste Per Person",
+        "Other Countries"
+      ),
+      fill = c(
+        "#4E79A7",
+        "#F28E2B",
+        "#D9D9D9"
+      ),
+      bty = "n",
+      cex = 0.9
+    )
+    
+    top_labels <- dorling %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
+    top_labels$name[top_labels$name == "United States of America"] <- "USA"
+    
+    coords <- st_coordinates(st_point_on_surface(top_labels))
+    
+    top5_tonnes_map <- dorling %>%
+      filter(adm0_a3 %in% top5_tonnes$map_code)
+    
+    top5_per_capita_map <- dorling %>%
+      filter(adm0_a3 %in% top5_per_capita$map_code)
+    
+    coords_tonnes <- st_coordinates(
+      st_point_on_surface(top5_tonnes_map)
+    )
+    
+    coords_per_capita <- st_coordinates(
+      st_point_on_surface(top5_per_capita_map)
+    )
+  
+    
+    text(
+      coords_tonnes[,1],
+      coords_tonnes[,2],
+      labels = top5_tonnes_map$name,
+      cex = 0.8,
+      col = "black"
+    )
+    
+    text(
+      coords_per_capita[,1],
+      coords_per_capita[,2],
+      labels = top5_per_capita_map$name,
+      cex = 0.8,
+      col = "black"
     )
     
   })
