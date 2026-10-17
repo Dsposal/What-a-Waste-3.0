@@ -411,9 +411,21 @@ server <- function(input, output, session) {
       weight = "value"
     )
     
+    top5 <- dorling %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
+    dorling$fill_colour <- ifelse(
+      dorling$name %in% top5$name,
+      "red",
+      "lightblue"
+    )
+    
+    print(top5$name)
+    
     plot(
       st_geometry(dorling),
-      col = "lightblue",
+      col = dorling$fill_colour,
       border = "black",
       main = "Municipal Solid Waste Generation (2030)"
     )
