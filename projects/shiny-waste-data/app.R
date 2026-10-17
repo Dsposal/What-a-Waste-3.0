@@ -534,6 +534,8 @@ server <- function(input, output, session) {
     animation_df <- data.frame(
       country = dorling_tonnes$name,
       iso3 = dorling_tonnes$adm0_a3,
+      value_start = dorling_tonnes$value,
+      value_end = dorling_per_capita$value,
       x_start = centres_tonnes[,1],
       y_start = centres_tonnes[,2],
       x_end = centres_capita[,1],
@@ -549,6 +551,42 @@ server <- function(input, output, session) {
     animation_df$y_current <-
       animation_df$y_start +
       (animation_df$y_end - animation_df$y_start) * progress
+    
+    animation_df$value_current <-
+      animation_df$value_start +
+      (animation_df$value_end - animation_df$value_start) * progress
+    
+    animation_df$radius_current <-
+      log10(animation_df$value_current + 1) * 200000
+    
+    print(summary(animation_df$radius_current))
+    
+    summary(animation_df$radius_current)
+    
+    symbols(
+      animation_df$x_current,
+      animation_df$y_current,
+      circles = animation_df$radius_current,
+      inches = FALSE,
+      bg = "lightgrey",
+      fg = "black",
+      asp = 1,
+      main = paste(
+        "Animated Bubbles",
+        round(progress * 100),
+        "%"
+      )
+    )
+    
+    text(
+      animation_df$x_current,
+      animation_df$y_current,
+      labels = animation_df$iso3,
+      cex = 0.4,
+      pos = 3
+    )
+    
+    return()
     
     ########################################################
     # MOVEMENT ANALYSIS
