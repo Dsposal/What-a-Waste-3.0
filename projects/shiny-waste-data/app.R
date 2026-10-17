@@ -381,9 +381,10 @@ server <- function(input, output, session) {
       filter(
         !is.na(value)
       ) %>%
-      select(
-        map_code,
-        value
+      group_by(map_code) %>%
+      summarise(
+        value = first(na.omit(value)),
+        .groups = "drop"
       )
 
     # Join on country code, not name (see R/lookups.R)
