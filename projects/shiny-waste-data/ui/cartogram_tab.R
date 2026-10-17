@@ -12,7 +12,12 @@ cartogramTab <- tabPanel(
       "Tonnes per year",
       "Kilograms per person per day"
     ),
-    selected = "Kilograms per person per day"
+    selected = "Tonnes per year"
+  ),
+  
+  actionButton(
+    "animateDorling",
+    "▶ Show Per-Capita View"
   ),
   
   plotOutput(
