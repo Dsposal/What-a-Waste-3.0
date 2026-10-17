@@ -20,6 +20,7 @@
 # R/geography.R
 # R/race.R
 # R/policy.R
+# R/treatment_gap.R
 #
 # ui/home_tab.R
 # ui/data_explorer_tab.R
@@ -27,6 +28,7 @@
 # ui/cartogram_tab.R
 # ui/race_tab.R
 # ui/policy_tab.R
+# ui/treatment_gap_tab.R
 #
 # AI NOTES
 # --------
@@ -60,6 +62,7 @@ source("R/lookups.R")
 source("R/geography.R")
 source("R/race.R")
 source("R/policy.R")
+source("R/treatment_gap.R")
 
 # Then load tabs
 source("ui/home_tab.R")
@@ -68,6 +71,7 @@ source("ui/map_tab.R")
 source("ui/cartogram_tab.R")
 source("ui/race_tab.R")
 source("ui/policy_tab.R")
+source("ui/treatment_gap_tab.R")
 
 
 # User Interface
@@ -82,7 +86,8 @@ ui <- fluidPage(
     mapTab,
     cartogramTab,
     raceTab,
-    policyTab
+    policyTab,
+    treatmentGapTab
     
   )
   
@@ -603,6 +608,21 @@ server <- function(input, output, session) {
   output$eprMap <- renderPlotly(epr_map(input$policyMetric))
 
   output$eprGap <- renderPlotly(epr_gap_chart(input$policyMetric))
+
+  ############################################################
+  # TREATMENT GAP 2050
+  #
+  # The map is built in R/treatment_gap.R; the
+  # legend is in ui/treatment_gap_tab.R.
+  ############################################################
+
+  output$treatmentGapMap <- renderPlotly(
+    treatment_gap_map(input$treatmentGapMeasure)
+  )
+
+  output$treatmentGapLegend <- renderUI(
+    treatment_gap_legend(input$treatmentGapMeasure)
+  )
 
 }
 
