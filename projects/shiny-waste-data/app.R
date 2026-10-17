@@ -1,464 +1,202 @@
 ############################################################
-# WHAT A WASTE 3.0
+# E-WASTE EXPLORER
+# app.R — Shiny entry point
 #
-# PURPOSE
-# -------
-# Main Shiny application entry point.
+# Study focus: e-waste and the electronics trade, with
+# China, the USA and India (the largest producers in
+# What a Waste 3.0) contrasted against their population.
 #
-# RESPONSIBILITIES
-# ----------------
-# - Load libraries
-# - Load datasets and reference data
-# - Load tab definitions
-# - Define UI
-# - Define server logic
-#
-# RELATED FILES
-# -------------
-# R/data.R
-# R/lookups.R
-# R/geography.R
-# R/race.R
-# R/policy.R
-#
-# ui/home_tab.R
-# ui/data_explorer_tab.R
-# ui/map_tab.R
-# ui/cartogram_tab.R
-# ui/race_tab.R
-# ui/policy_tab.R
+# FILE MAP
+# --------
+# R/data.R      load + reshape WaW3 (pure functions)
+# R/trade.R     load + summarise Chatham House trade csv
+# R/lookups.R   ISO codes, focus countries, colours
+# R/classes.R   EwasteStore (R6) + ewaste_profile (S3)
+# R/plots.R     plotly chart functions
+# ui/tabs.R     one function per tab
 #
 # AI NOTES
 # --------
-# UI tab definitions should live in ui/*.
-#
-# Country cleaning should live in R/lookups.R.
-#
-# Natural Earth and sf spatial logic should live in
-# R/geography.R.
-#
-# Avoid adding large data preparation logic directly
-# into app.R.
+# Keep data logic out of this file. The server should only
+# call store methods and plot_* functions.
 ############################################################
 
 library(shiny)
-library(readr)
+library(bslib)
 library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(DT)
-library(leaflet)
-library(sf)
-library(rnaturalearth)
-library(cartogram)
 library(plotly)
+library(DT)
 
-# Load files
-# Data first
-source("R/data.R")
-source("R/lookups.R")
-source("R/geography.R")
-source("R/race.R")
-source("R/policy.R")
+for (f in c("R/lookups.R", "R/data.R", "R/trade.R", "R/classes.R",
+            "R/plots.R", "ui/tabs.R")) source(f)
 
-# Then load tabs
-source("ui/home_tab.R")
-source("ui/data_explorer_tab.R")
-source("ui/map_tab.R")
-source("ui/cartogram_tab.R")
-source("ui/race_tab.R")
-source("ui/policy_tab.R")
-
-
-# User Interface
-ui <- fluidPage(
-  
-  titlePanel("What a Waste 3.0"),
-  
-  tabsetPanel(
-    
-    homeTab,
-    dataExplorerTab,
-    mapTab,
-    cartogramTab,
-    raceTab,
-    policyTab
-    
-  )
-  
+store <- EwasteStore$new(
+  waw_path   = "data/WaW3.csv",
+  trade_path = "data/trade_electronics.csv"   # optional
 )
 
-# Server
+country_choices <- with(store$countries %>% filter(has_both) %>% arrange(country),
+                        setNames(iso3, country))
 
+# ---------------------------------------------------------- UI
+ui <- page_navbar(
+  title = "E-waste explorer",
+  theme = bs_theme(version = 5, base_font = font_collection(font_google("Inter", local = FALSE), "system-ui", "sans-serif"),
+                   primary = "#2a78d6", bg = "#fcfcfb", fg = "#2b2b29"),
+  sidebar = sidebar(
+    selectizeInput("focus", "Focus countries", choices = country_choices,
+                   selected = FOCUS_DEFAULT, multiple = TRUE,
+                   options = list(maxItems = 8)),
+    actionButton("reset", "Back to China · USA · India", class = "btn-sm"),
+    helpText("China, the USA and India keep fixed colours. Extra countries show in dark grey with labels.")
+  ),
+  tab_overview(), tab_per_person(), tab_trade(), tab_data(), tab_about()
+)
+
+# ------------------------------------------------------ server
 server <- function(input, output, session) {
 
-  # Build country-level map data for the selected year.
-  #
-  # Users select:
-  #   2021
-  #   2022
-  #   2030
-  #   2040
-  #   2050
-  #
-  # The selected year is converted into a generic 'value'
-  # column so that the mapping code remains independent
-  # of the underlying year.
-  
-  map_data <- reactive({
-    
-    msw <- waw_clean %>%
-      filter(
-        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-        UNIT_MEASURE_LABEL == "Tonnes per year"
-      ) %>%
-      mutate(
-        value = as.numeric(.data[[input$mapYear]])
-      ) %>%
-      filter(
-        !is.na(value)
-      ) %>%
-      group_by(map_code) %>%
-      summarise(
-        value = first(value),
-        .groups = "drop"
-      )
-    
-    world %>%
-      left_join(
-        msw,
-        by = c("adm0_a3" = "map_code")
-      )
-    
+  observeEvent(input$reset, updateSelectizeInput(session, "focus", selected = FOCUS_DEFAULT))
+
+  focus_iso <- reactive({
+    validate(need(length(input$focus) > 0, "Pick at least one country."))
+    input$focus
   })
-  
-  
-  filtered_msw <- reactive({
+  focus_df <- reactive(store$focus(focus_iso()))
 
-    waw %>%
-      filter(
-        REF_AREA_LABEL == input$area,
-        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-        UNIT_MEASURE_LABEL == "Tonnes per year"
-      ) %>%
-      summarise(
-        across(
-          matches("^\\d{4}$"),
-          ~ sum(as.numeric(.), na.rm = TRUE)
-        )
-      ) %>%
-      pivot_longer(
-        everything(),
-        names_to = "Year",
-        values_to = "Value"
-      ) %>%
-      mutate(
-        Year = as.numeric(Year)
-      ) %>%
-      arrange(Year)
-
+  # Trade data lives in a reactiveVal so uploads re-render
+  trade_rv <- reactiveVal(store$trade)
+  observeEvent(input$trade_file, {
+    tryCatch({
+      store$set_trade(input$trade_file$datapath)
+      trade_rv(store$trade)
+    }, error = function(e) showNotification(conditionMessage(e), type = "error", duration = 15))
   })
 
-  output$trendChart <- renderPlot({
-
-    # Build forecast line for selected area
-    trusted_points <- filtered_msw() %>%
-      filter(Year %in% c(2022, 2030, 2040, 2050))
-
-    forecast_model <- lm(
-      Value ~ Year,
-      data = trusted_points
-    )
-
-    forecast_line <- data.frame(
-      Year = seq(
-        min(filtered_msw()$Year),
-        max(filtered_msw()$Year),
-        by = 1
+  # ---- Overview
+  output$profile_cards <- renderUI({
+    profiles <- lapply(focus_iso(), store$profile)
+    boxes <- lapply(profiles, function(p) {
+      value_box(
+        title = p$country,
+        value = sprintf("%.1f million t", p$tonnes / 1e6),
+        p(sprintf("%.1f kg per person · %s data", p$kg_per_person, p$year)),
+        p(sprintf("%.1f%% of e-waste, %.1f%% of people",
+                  100 * p$share_ewaste, 100 * p$share_population)),
+        theme = value_box_theme(bg = "#ffffff", fg = "#2b2b29"),
+        showcase = div(style = sprintf("width:6px;height:60px;border-radius:3px;background:%s",
+                                       country_colour(p$iso3, focus_iso())))
       )
-    )
-
-    forecast_line$Value <- predict(
-      forecast_model,
-      newdata = forecast_line
-    )
-
-    ggplot() +
-
-      geom_line(
-        data = filtered_msw(),
-        aes(
-          x = Year,
-          y = Value
-        ),
-        linewidth = 1.2,
-        colour = "#0072B2"
-      ) +
-
-      geom_point(
-        data = filtered_msw(),
-        aes(
-          x = Year,
-          y = Value
-        ),
-        colour = "#0072B2"
-      ) +
-
-      geom_line(
-        data = forecast_line,
-        aes(
-          x = Year,
-          y = Value
-        ),
-        colour = "#D55E00",
-        linewidth = 1.5,
-        linetype = "dashed"
-      ) +
-
-      labs(
-        x = "Year",
-        y = "Tonnes per year",
-        title = paste(
-          input$area,
-          "Municipal Solid Waste Generation"
-        )
-      ) +
-
-      theme_minimal()
-
+    })
+    do.call(layout_columns, c(list(fill = FALSE), boxes))
   })
 
-  output$dataTable <- renderDT({
+  output$share_contrast <- renderPlotly(plot_share_contrast(focus_df()))
 
-    datatable(
-      filtered_msw(),
-      options = list(
-        pageLength = 20,
-        order = list(list(1, 'desc'))
-      )
-    )
-
-  })
-  
-  output$map <- renderLeaflet({
-    
-    map_df <- map_data()
-    
-    print(input$mapScale)
-    
-    values <- map_df$value
-    
-    if (input$mapScale == "Natural") {
-      
-      map_df$display_value <- map_df$value
-      
-      pal <- colorNumeric(
-        palette = input$mapPalette,
-        domain = map_df$display_value,
-        na.color = "#d3d3d3"
-      )
-      
-    } else if (input$mapScale == "Logarithmic") {
-      
-      map_df$display_value <- ifelse(
-        map_df$value > 0,
-        log10(map_df$value),
-        NA
-      )
-      
-      pal <- colorNumeric(
-        palette = input$mapPalette,
-        domain = map_df$display_value,
-        na.color = "#d3d3d3"
-      )
-      
-    } else if (input$mapScale == "Quantiles") {
-      
-      map_df$display_value <- map_df$value
-      
-      pal <- colorQuantile(
-        palette = input$mapPalette,
-        domain = map_df$display_value,
-        n = 7,
-        na.color = "#d3d3d3"
-      )
-      
-    } else if (input$mapScale == "Percentile") {
-      
-      map_df$display_value <- percent_rank(map_df$value)
-      
-      pal <- colorNumeric(
-        palette = input$mapPalette,
-        domain = c(0, 1),
-        na.color = "#d3d3d3"
-      )
-      
-    }
-    
-    leaflet(map_df) %>%
-      
-      addTiles() %>%
-      
-      addPolygons(
-        
-        fillColor = ~pal(display_value),
-        
-        fillOpacity = 0.8,
-        
-        color = "#666666",
-        
-        weight = 0.5,
-        
-        popup = ~paste(
-          "<b>", name, "</b>",
-          "<br>",
-          input$mapYear,
-          ": ",
-          format(
-            round(as.numeric(value)),
-            big.mark = ","
-          ),
-          " tonnes"
-        )
-      ) %>%
-      
-      addLegend(
-        position = "bottomright",
-        pal = pal,
-        values = map_df$display_value,
-        title = paste(
-          input$mapScale,
-          "-",
-          input$mapYear
-        )
-      ) %>%
-      
-      setView(
-        lng = 0,
-        lat = 20,
-        zoom = 2
-      )
-    
+  output$share_note <- renderText({
+    s <- store$combined_share(focus_iso())
+    sprintf("Together these countries produce %.0f%% of reported e-waste but hold %.0f%% of the population.",
+            100 * s$share_ewaste, 100 * s$share_population)
   })
 
-  ############################################################
-  # DORLING CARTOGRAM
-  #
-  # PURPOSE
-  # -------
-  # Visualise waste metrics using circle sizes rather
-  # than geographic area.
-  #
-  # PROCESS
-  # -------
-  # WaW Data
-  #   -> Country Normalisation
-  #   -> Natural Earth Join
-  #   -> Projection
-  #   -> Cartogram Generation
-  #
-  # AI NOTES
-  # --------
-  # Cartograms require projected geometries.
-  #
-  # If errors mention longitude/latitude, check
-  # st_transform().
-  #
-  # Missing bubbles are usually caused by failed country
-  # name joins or missing values.
-  ############################################################
-  
-  output$dorlingPlot <- renderPlot({
-    
-    msw <- waw_clean %>%
-      filter(
-        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-        UNIT_MEASURE_LABEL == input$cartogramUnit
-      ) %>%
-      mutate(
-        value = as.numeric(`2030`)
-      ) %>%
-      filter(
-        !is.na(value)
-      ) %>%
-      select(
-        map_code,
-        value
-      )
+  # ---- Per person
+  output$per_person <- renderPlotly(
+    plot_per_person(focus_df(), store$median_per_person(), focus_iso()))
+  output$scatter <- renderPlotly(plot_population_scatter(store$countries, focus_iso()))
 
-    # Join on country code, not name (see R/lookups.R)
-    world_msw <- world %>%
-      left_join(
-        msw,
-        by = c("adm0_a3" = "map_code")
-      )
-    
-    world_msw_proj <- st_transform(
-      world_msw,
-      3857
-    )
-    
-    world_msw_dorling <- world_msw_proj %>%
-      filter(
-        !is.na(value),
-        value > 0
-      )
-    
-    dorling <- cartogram_dorling(
-      world_msw_dorling,
-      weight = "value"
-    )
-    
-    plot(
-      dorling["value"],
-      main = "Municipal Solid Waste Generation (2030)"
-    )
-    
+  # ---- Trade
+  output$trade_year_ui <- renderUI({
+    req(trade_rv())
+    yrs <- store$years_available()
+    if (length(yrs)) selectInput("trade_year", "Year", yrs, selected = yrs[1])
   })
-  
-  ############################################################
-  # COUNTRY RACE
-  #
-  # The chart is built in R/race.R.
-  ############################################################
+  trade_year <- reactive(if (is.null(input$trade_year)) NULL else as.integer(input$trade_year))
 
-  race_unit_data <- reactive({
-
-    df <- race_frames %>%
-      filter(unit == input$raceUnit)
-
-    # Per person: skip small territories (see R/race.R)
-    if (input$raceUnit == "Kilograms per person per day") {
-      df <- df %>% filter(population >= 1e6)
-    }
-
-    df
-
+  output$trade_status <- renderText({
+    if (is.null(trade_rv())) "No trade file loaded yet."
+    else sprintf("%s trade rows loaded.", format(nrow(trade_rv()), big.mark = ","))
   })
 
-  output$racePlot <- renderPlotly({
-
-    race_plot(
-      race_unit_data(),
-      top_n = as.numeric(input$raceTop),
-      is_tonnes = input$raceUnit == "Tonnes per year"
-    )
-
+  output$trade_embed <- renderUI({
+    tags$iframe(src = trade_embed_url(input$embed_year, input$trade_units),
+                width = "100%", height = "380", frameborder = "0", scrolling = "no",
+                style = "border:0;display:block")
   })
 
-  ############################################################
-  # POLICY
-  #
-  # Charts are built in R/policy.R; the map key is in
-  # ui/policy_tab.R.
-  ############################################################
+  output$trade_balance <- renderPlotly({
+    validate(need(trade_rv(), "Load a trade csv to see exports and imports."))
+    bal <- tryCatch(trade_balance(trade_rv(), focus_iso(), trade_year(), input$trade_units),
+                    error = function(e) validate(need(FALSE, conditionMessage(e))))
+    plot_trade_balance(bal, store$countries, input$trade_units)
+  })
 
-  output$eprKey <- renderUI(epr_key(input$policyMetric))
+  # extract_waste(): tonnes traded per country + population
+  waste_df <- reactive({
+    req(trade_rv())
+    tryCatch(extract_waste(trade_rv(), store$countries, trade_year()),
+             error = function(e) validate(need(FALSE, conditionMessage(e))))
+  })
 
-  output$eprMap <- renderPlotly(epr_map(input$policyMetric))
+  output$export_vs_generated <- renderPlotly({
+    validate(need(trade_rv(), "Load a weight-units trade csv."))
+    plot_export_vs_generated(waste_df(), focus_iso())
+  })
 
-  output$eprGap <- renderPlotly(epr_gap_chart(input$policyMetric))
+  output$waste_table <- renderDT({
+    validate(need(trade_rv(), "Load a weight-units trade csv."))
+    d <- waste_df() %>%
+      transmute(Country = country, ISO3 = iso3,
+                `Exported (t)` = round(exported_t), `Imported (t)` = round(imported_t),
+                `Net import (t)` = round(net_import_t),
+                `E-waste generated (t)` = round(ewaste_tonnes),
+                `Population (m)` = round(population / 1e6, 1),
+                `Net import kg/person` = round(net_import_kg_per_person, 2),
+                `Exported % of generated` = exported_pct_of_generated)
+    datatable(d, rownames = FALSE, filter = "top", options = list(pageLength = 10)) %>%
+      formatPercentage("Exported % of generated", 1)
+  })
 
+  output$partner_cards <- renderUI({
+    req(trade_rv())
+    cards <- lapply(focus_iso(), function(i)
+      card(plotlyOutput(paste0("partners_", i), height = "300px")))
+    do.call(layout_columns, c(list(col_widths = 4), cards))
+  })
+
+  observe({
+    req(trade_rv())
+    flows <- tryCatch(
+      top_flows(trade_rv(), focus_iso(), n = 8, direction = input$flow_dir,
+                yr = trade_year(), measure = input$trade_units),
+      error = function(e) NULL)
+    req(flows)
+    for (i in focus_iso()) local({
+      iso <- i
+      output[[paste0("partners_", iso)]] <- renderPlotly(
+        plot_top_partners(flows, iso, input$flow_dir, input$trade_units))
+    })
+  })
+
+  # ---- Data
+  table_df <- reactive({
+    store$countries %>%
+      transmute(Country = country, ISO3 = iso3, Region = region, Year = ewaste_year,
+                `E-waste (t)` = round(ewaste_tonnes),
+                `Population (m)` = round(population / 1e6, 1),
+                `kg / person` = round(kg_per_person, 1),
+                `Share e-waste` = share_ewaste, `Share population` = share_population,
+                `E-waste EPR` = ewaste_epr)
+  })
+  output$table <- renderDT(
+    datatable(table_df(), rownames = FALSE, filter = "top",
+              options = list(pageLength = 15, order = list(list(4, "desc")))) %>%
+      formatPercentage(c("Share e-waste", "Share population"), 2) %>%
+      formatRound("E-waste (t)", 0)
+  )
+  output$download_csv <- downloadHandler(
+    filename = function() "ewaste_by_country.csv",
+    content = function(file) readr::write_csv(table_df(), file)
+  )
 }
 
 shinyApp(ui, server)
