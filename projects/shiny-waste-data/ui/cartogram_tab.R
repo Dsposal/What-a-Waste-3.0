@@ -15,6 +15,15 @@ cartogramTab <- tabPanel(
     selected = "Tonnes per year"
   ),
   
+  sliderInput(
+    "animationProgress",
+    "Animation Progress",
+    min = 0,
+    max = 1,
+    value = 0,
+    step = 0.05
+  ),
+  
   actionButton(
     "animateDorling",
     "▶ Show Per-Capita View"
