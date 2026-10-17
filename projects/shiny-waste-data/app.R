@@ -20,6 +20,7 @@
 # R/geography.R
 # R/race.R
 # R/policy.R
+# R/waste_flows.R
 #
 # ui/home_tab.R
 # ui/data_explorer_tab.R
@@ -27,6 +28,7 @@
 # ui/cartogram_tab.R
 # ui/race_tab.R
 # ui/policy_tab.R
+# ui/waste_flows_tab.R
 #
 # AI NOTES
 # --------
@@ -60,6 +62,7 @@ source("R/lookups.R")
 source("R/geography.R")
 source("R/race.R")
 source("R/policy.R")
+source("R/waste_flows.R")
 
 # Then load tabs
 source("ui/home_tab.R")
@@ -68,6 +71,7 @@ source("ui/map_tab.R")
 source("ui/cartogram_tab.R")
 source("ui/race_tab.R")
 source("ui/policy_tab.R")
+source("ui/waste_flows_tab.R")
 
 
 # User Interface
@@ -82,8 +86,9 @@ ui <- fluidPage(
     mapTab,
     cartogramTab,
     raceTab,
-    policyTab
-    
+    policyTab,
+    flowsTab
+
   )
   
 )
@@ -603,6 +608,74 @@ server <- function(input, output, session) {
   output$eprMap <- renderPlotly(epr_map(input$policyMetric))
 
   output$eprGap <- renderPlotly(epr_gap_chart(input$policyMetric))
+
+  ############################################################
+  # WHERE WASTE GOES
+  #
+  # The chart is built in R/waste_flows.R. The income group
+  # and country dropdowns hold the drill-down state, so a
+  # click on the chart just updates them.
+  ############################################################
+
+  # Country list follows the income group
+  observeEvent(input$flowIncome, {
+    updateSelectInput(
+      session, "flowCountry",
+      choices = flow_country_choices(input$flowIncome)
+    )
+  })
+
+  # Click a group to see its countries, or a country to see
+  # it alone. The key comes from the chart's customdata.
+  observeEvent(event_data("plotly_click", source = "flows"), {
+    key <- event_data("plotly_click", source = "flows")$customdata
+    if (is.null(key) || length(key) == 0 || key[1] == "") return()
+    parts <- strsplit(key[1], ":")[[1]]
+    if (parts[1] == "income") {
+      updateSelectInput(session, "flowIncome", selected = parts[2])
+    } else if (parts[1] == "country") {
+      updateSelectInput(session, "flowCountry", selected = parts[2])
+    }
+  })
+
+  observeEvent(input$flowReset, {
+    updateSelectInput(session, "flowIncome", selected = "All")
+    updateSelectInput(session, "flowCountry", selected = "All")
+  })
+
+  output$flowSankey <- renderPlotly({
+    req(input$flowCountry)
+    flow_sankey(
+      input$flowYear,
+      input$flowMeasure,
+      group = input$flowIncome,
+      iso = input$flowCountry
+    )
+  })
+
+  output$flowNote <- renderText({
+
+    cov <- flow_coverage
+    if (input$flowIncome != "All") cov <- cov %>% filter(income == input$flowIncome)
+
+    paste0(
+      "Each country's latest complete treatment survey, applied to its ",
+      input$flowYear, " tonnes. Covers ",
+      sum(cov$surveyed_countries), " of ", sum(cov$countries), " countries",
+      if (input$flowIncome != "All") {
+        sprintf(" (%.0f%% of the group's 2022 tonnes)", cov$tonnes_pct)
+      } else {
+        ""
+      },
+      ". A treatment type missing from a survey (for example China has no recycling row) counts as 0%.",
+      if (input$flowYear == "2050") {
+        " 2050 uses projected tonnes with today's shares."
+      } else {
+        ""
+      }
+    )
+
+  })
 
 }
 
