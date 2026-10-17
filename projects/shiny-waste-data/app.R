@@ -105,13 +105,23 @@ server <- function(input, output, session) {
   # column so that the mapping code remains independent
   # of the underlying year.
   
+  animation_progress <- reactiveVal(0)
+  
+  observe({
+    animation_progress(input$animationProgress)
+  })
+  
   observeEvent(input$animateDorling, {
     
-    updateSelectInput(
-      session,
-      "cartogramUnit",
-      selected = "Kilograms per person per day"
-    )
+    animation_progress(0)
+    
+    for (i in 0:100) {
+      
+      animation_progress(i / 100)
+      
+      Sys.sleep(0.05)
+      
+    }
     
   })
   
@@ -523,6 +533,8 @@ server <- function(input, output, session) {
     # to smoothly morph the cartogram.
     ########################################################
     
+    
+    
     centres_tonnes <- st_coordinates(
       st_centroid(dorling_tonnes)
     )
@@ -531,59 +543,78 @@ server <- function(input, output, session) {
       st_centroid(dorling_per_capita)
     )
     
+    top5_tonnes <- msw_tonnes %>%
+      filter(!is.na(value)) %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
+    top5_per_capita <- msw_per_capita %>%
+      arrange(desc(value)) %>%
+      head(5)
+    
     animation_df <- data.frame(
       country = dorling_tonnes$name,
       iso3 = dorling_tonnes$adm0_a3,
-      value_start = dorling_tonnes$value,
-      value_end = dorling_per_capita$value,
-      x_start = centres_tonnes[,1],
-      y_start = centres_tonnes[,2],
-      x_end = centres_capita[,1],
-      y_end = centres_capita[,2]
+      x = centres_tonnes[,1],
+      y = centres_tonnes[,2],
+      
+      value_start =
+        dorling_tonnes$value /
+        max(dorling_tonnes$value),
+      
+      value_end =
+        dorling_per_capita$value /
+        max(dorling_per_capita$value)
     )
     
-    progress <- input$animationProgress
-    
-    animation_df$x_current <-
-      animation_df$x_start +
-      (animation_df$x_end - animation_df$x_start) * progress
-    
-    animation_df$y_current <-
-      animation_df$y_start +
-      (animation_df$y_end - animation_df$y_start) * progress
+    progress <- animation_progress()
     
     animation_df$value_current <-
       animation_df$value_start +
       (animation_df$value_end - animation_df$value_start) * progress
     
     animation_df$radius_current <-
-      log10(animation_df$value_current + 1) * 200000
+      animation_df$value_current * 3000000
     
     print(summary(animation_df$radius_current))
     
     summary(animation_df$radius_current)
     
+    animation_df$fill_colour <- "lightgrey"
+    
+    animation_df$fill_colour[
+      animation_df$iso3 %in% top5_tonnes$map_code
+    ] <- "#4E79A7"
+    
+    animation_df$fill_colour[
+      animation_df$iso3 %in% top5_per_capita$map_code
+    ] <- "#F28E2B"
+    
     symbols(
-      animation_df$x_current,
-      animation_df$y_current,
+      animation_df$x,
+      animation_df$y,
       circles = animation_df$radius_current,
       inches = FALSE,
-      bg = "lightgrey",
+      bg = animation_df$fill_colour,
       fg = "black",
       asp = 1,
       main = paste(
-        "Animated Bubbles",
+        "From Tonnes per Year to Kilograms per Person per Day\n",
         round(progress * 100),
-        "%"
+        "% Complete"
       )
+      
     )
     
+    label_df <- animation_df %>%
+      filter(fill_colour != "lightgrey")
+    
     text(
-      animation_df$x_current,
-      animation_df$y_current,
-      labels = animation_df$iso3,
-      cex = 0.4,
-      pos = 3
+      label_df$x,
+      label_df$y,
+      labels = label_df$iso3,
+      cex = 0.7,
+      col = "black"
     )
     
     return()
@@ -615,14 +646,7 @@ server <- function(input, output, session) {
     ) %>%
       arrange(desc(distance))
     
-    top5_tonnes <- msw_tonnes %>%
-      filter(!is.na(value)) %>%
-      arrange(desc(value)) %>%
-      head(5)
-    
-    top5_per_capita <- msw_per_capita %>%
-      arrange(desc(value)) %>%
-      head(5)
+
     
     ########################################################
     # CURRENT CARTOGRAM
