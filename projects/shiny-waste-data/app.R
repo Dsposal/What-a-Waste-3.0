@@ -19,12 +19,14 @@
 # R/lookups.R
 # R/geography.R
 # R/race.R
+# R/policy.R
 #
 # ui/home_tab.R
 # ui/data_explorer_tab.R
 # ui/map_tab.R
 # ui/cartogram_tab.R
 # ui/race_tab.R
+# ui/policy_tab.R
 #
 # AI NOTES
 # --------
@@ -57,6 +59,7 @@ source("R/data.R")
 source("R/lookups.R")
 source("R/geography.R")
 source("R/race.R")
+source("R/policy.R")
 
 # Then load tabs
 source("ui/home_tab.R")
@@ -64,6 +67,7 @@ source("ui/data_explorer_tab.R")
 source("ui/map_tab.R")
 source("ui/cartogram_tab.R")
 source("ui/race_tab.R")
+source("ui/policy_tab.R")
 
 
 # User Interface
@@ -77,7 +81,8 @@ ui <- fluidPage(
     dataExplorerTab,
     mapTab,
     cartogramTab,
-    raceTab
+    raceTab,
+    policyTab
     
   )
   
@@ -440,6 +445,19 @@ server <- function(input, output, session) {
     )
 
   })
+
+  ############################################################
+  # POLICY
+  #
+  # Charts are built in R/policy.R; the map key is in
+  # ui/policy_tab.R.
+  ############################################################
+
+  output$eprKey <- renderUI(epr_key(input$policyMetric))
+
+  output$eprMap <- renderPlotly(epr_map(input$policyMetric))
+
+  output$eprGap <- renderPlotly(epr_gap_chart(input$policyMetric))
 
 }
 
