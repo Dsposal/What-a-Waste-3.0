@@ -424,63 +424,7 @@ server <- function(input, output, session) {
   # name joins or missing values.
   ############################################################
   
-  output$dorlingPlot <- renderPlot({
-    
-    msw <- waw_clean %>%
-      filter(
-        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-        UNIT_MEASURE_LABEL == input$cartogramUnit
-      ) %>%
-      mutate(
-        value = as.numeric(`2030`)
-      ) %>%
-      filter(
-        !is.na(value)
-      ) %>%
-      group_by(map_code) %>%
-      summarise(
-        value = first(na.omit(value)),
-        .groups = "drop"
-      )
-    
-    # Join on country code, not name (see R/lookups.R)
-    world_msw <- world %>%
-      left_join(
-        msw,
-        by = c("adm0_a3" = "map_code")
-      )
-    
-    world_msw_proj <- st_transform(
-      world_msw,
-      3857
-    )
-    
-    world_msw_dorling <- world_msw_proj %>%
-      filter(
-        !is.na(value),
-        value > 0
-      )
-    
-    ########################################################
-    # ANIMATION RESEARCH
-    #
-    # PURPOSE
-    # -------
-    # Build equivalent Dorling cartograms for both:
-    #
-    # - Tonnes per year
-    # - Kilograms per person per day
-    #
-    # This allows country locations to be compared between
-    # states and is the foundation for future cartogram
-    # animation.
-    #
-    # AI NOTES
-    # --------
-    # Both cartograms currently contain 215 countries and
-    # share the same ISO3 identifiers, making country-level
-    # interpolation possible.
-    ########################################################
+  output$dorlingPlot <- renderPlotly({
     
     msw_tonnes <- waw_clean %>%
       filter(
@@ -490,9 +434,7 @@ server <- function(input, output, session) {
       mutate(
         value = as.numeric(`2030`)
       ) %>%
-      filter(
-        !is.na(value)
-      ) %>%
+      filter(!is.na(value)) %>%
       group_by(map_code) %>%
       summarise(
         value = first(na.omit(value)),
@@ -507,9 +449,7 @@ server <- function(input, output, session) {
       mutate(
         value = as.numeric(`2030`)
       ) %>%
-      filter(
-        !is.na(value)
-      ) %>%
+      filter(!is.na(value)) %>%
       group_by(map_code) %>%
       summarise(
         value = first(na.omit(value)),
@@ -520,147 +460,32 @@ server <- function(input, output, session) {
       left_join(
         msw_tonnes,
         by = c("adm0_a3" = "map_code")
-      )
+      ) %>%
+      filter(!is.na(value), value > 0)
     
     world_per_capita <- world %>%
       left_join(
         msw_per_capita,
         by = c("adm0_a3" = "map_code")
-      )
-    
-    dorling_tonnes <- cartogram_dorling(
-      st_transform(
-        world_tonnes %>% filter(!is.na(value), value > 0),
-        3857
-      ),
-      weight = "value"
-    )
-    
-    dorling_per_capita <- cartogram_dorling(
-      st_transform(
-        world_per_capita %>% filter(!is.na(value), value > 0),
-        3857
-      ),
-      weight = "value"
-    )
-    
-    ########################################################
-    # CARTOGRAM INTERPOLATION DATA
-    #
-    # PURPOSE
-    # -------
-    # Extract cartogram centre points from both states and
-    # calculate intermediary positions.
-    #
-    # Example:
-    #
-    # Start (Tonnes)
-    #        ↓
-    # Midpoint
-    #        ↓
-    # End (Per Capita)
-    #
-    # Future animation can increase progress from:
-    #
-    # 0.0 -> 1.0
-    #
-    # to smoothly morph the cartogram.
-    ########################################################
-    
-    
-    map_centres <- st_coordinates(
-      st_centroid(world_msw_dorling)
-    )
-    
-    top5_tonnes <- msw_tonnes %>%
-      filter(!is.na(value)) %>%
-      arrange(desc(value)) %>%
-      head(5)
-    
-    top5_per_capita <- msw_per_capita %>%
-      arrange(desc(value)) %>%
-      head(5)
+      ) %>%
+      filter(!is.na(value), value > 0)
     
     animation_df <- data.frame(
-      country = world_msw_dorling$name,
-      iso3 = world_msw_dorling$adm0_a3,
-      x = map_centres[,1],
-      y = map_centres[,2],
+      country = world_tonnes$name,
+      iso3 = world_tonnes$adm0_a3,
       
       value_start =
-        dorling_tonnes$value /
-        max(dorling_tonnes$value),
+        world_tonnes$value /
+        max(world_tonnes$value),
       
       value_end =
-        dorling_per_capita$value /
-        max(dorling_per_capita$value)
+        world_per_capita$value /
+        max(world_per_capita$value)
     )
     
-    progress <- animation_progress()
-  
-    if (progress < 0.1) {
-      
-      plot(
-        st_geometry(world_msw),
-        col = "lightgrey",
-        border = "white",
-        main = "Global Municipal Waste Generation (2030)"
-      )
-      
-      return()
-      
-    }
-    
-    bubble_progress <- max(
-      0,
-      min(
-        1,
-        (progress - 0.1) / 0.9
-      )
-    )
-    
-    animation_df$value_current <-
-      animation_df$value_start +
-      (animation_df$value_end - animation_df$value_start) * bubble_progress
-    
-    animation_df$radius_current <-
-      animation_df$value_current * 3000000
-    
-    animation_df$fill_colour <- "lightgrey"
-    
-    animation_df$fill_colour[
-      animation_df$iso3 %in% top5_tonnes$map_code
-    ] <- "#4E79A7"
-    
-    animation_df$fill_colour[
-      animation_df$iso3 %in% top5_per_capita$map_code
-    ] <- "#F28E2B"
-    
-    symbols(
-      animation_df$x,
-      animation_df$y,
-      circles = animation_df$radius_current,
-      inches = FALSE,
-      bg = animation_df$fill_colour,
-      fg = "black",
-      asp = 1,
-      main = paste(
-        "From Tonnes per Year to Kilograms per Person per Day\n",
-        round(progress * 100),
-        "% Complete"
-      )
-      
-    )
-    
-    label_df <- animation_df %>%
-      filter(fill_colour != "lightgrey")
-    
-    text(
-      label_df$x,
-      label_df$y,
-      labels = label_df$iso3,
-      cex = 0.7,
-      col = "black"
+    waste_animation_map(
+      animation_df = animation_df,
+      progress = animation_progress()
     )
     
   })
