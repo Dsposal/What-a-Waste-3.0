@@ -20,7 +20,11 @@
 # R/geography.R
 # R/race.R
 # R/policy.R
+<<<<<<< HEAD
 # R/waste_flows.R
+=======
+# R/treatment_gap.R
+>>>>>>> origin/feature/treatment-gap
 #
 # ui/home_tab.R
 # ui/data_explorer_tab.R
@@ -28,7 +32,11 @@
 # ui/cartogram_tab.R
 # ui/race_tab.R
 # ui/policy_tab.R
+<<<<<<< HEAD
 # ui/waste_flows_tab.R
+=======
+# ui/treatment_gap_tab.R
+>>>>>>> origin/feature/treatment-gap
 #
 # AI NOTES
 # --------
@@ -62,7 +70,11 @@ source("R/lookups.R")
 source("R/geography.R")
 source("R/race.R")
 source("R/policy.R")
+<<<<<<< HEAD
 source("R/waste_flows.R")
+=======
+source("R/treatment_gap.R")
+>>>>>>> origin/feature/treatment-gap
 
 # Then load tabs
 source("ui/home_tab.R")
@@ -71,7 +83,11 @@ source("ui/map_tab.R")
 source("ui/cartogram_tab.R")
 source("ui/race_tab.R")
 source("ui/policy_tab.R")
+<<<<<<< HEAD
 source("ui/waste_flows_tab.R")
+=======
+source("ui/treatment_gap_tab.R")
+>>>>>>> origin/feature/treatment-gap
 
 
 # User Interface
@@ -87,8 +103,13 @@ ui <- fluidPage(
     cartogramTab,
     raceTab,
     policyTab,
+<<<<<<< HEAD
     flowsTab
 
+=======
+    treatmentGapTab
+    
+>>>>>>> origin/feature/treatment-gap
   )
   
 )
@@ -616,7 +637,7 @@ server <- function(input, output, session) {
   # and country dropdowns hold the drill-down state, so a
   # click on the chart just updates them.
   ############################################################
-
+  
   # Country list follows the income group
   observeEvent(input$flowIncome, {
     updateSelectInput(
@@ -624,7 +645,7 @@ server <- function(input, output, session) {
       choices = flow_country_choices(input$flowIncome)
     )
   })
-
+  
   # Click a group to see its countries, or a country to see
   # it alone. The key comes from the chart's customdata.
   observeEvent(event_data("plotly_click", source = "flows"), {
@@ -637,12 +658,12 @@ server <- function(input, output, session) {
       updateSelectInput(session, "flowCountry", selected = parts[2])
     }
   })
-
+  
   observeEvent(input$flowReset, {
     updateSelectInput(session, "flowIncome", selected = "All")
     updateSelectInput(session, "flowCountry", selected = "All")
   })
-
+  
   output$flowSankey <- renderPlotly({
     req(input$flowCountry)
     flow_sankey(
@@ -652,12 +673,12 @@ server <- function(input, output, session) {
       iso = input$flowCountry
     )
   })
-
+  
   output$flowNote <- renderText({
-
+    
     cov <- flow_coverage
     if (input$flowIncome != "All") cov <- cov %>% filter(income == input$flowIncome)
-
+    
     paste0(
       "Each country's latest complete treatment survey, applied to its ",
       input$flowYear, " tonnes. Covers ",
@@ -674,8 +695,23 @@ server <- function(input, output, session) {
         ""
       }
     )
-
+    
   })
+  
+  ############################################################
+  # TREATMENT GAP 2050
+  #
+  # The map is built in R/treatment_gap.R; the
+  # legend is in ui/treatment_gap_tab.R.
+  ############################################################
+  
+  output$treatmentGapMap <- renderPlotly(
+    treatment_gap_map(input$treatmentGapMeasure)
+  )
+  
+  output$treatmentGapLegend <- renderUI(
+    treatment_gap_legend(input$treatmentGapMeasure)
+  )
 
 }
 
