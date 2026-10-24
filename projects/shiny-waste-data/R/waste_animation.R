@@ -7,6 +7,8 @@ library(dplyr)
 
 waste_animation_map <- function(animation_df, progress) {
   
+  print(progress)
+  
   # Bubble animation starts after 10%
   bubble_progress <- max(
     0,
@@ -16,19 +18,29 @@ waste_animation_map <- function(animation_df, progress) {
     )
   )
   
+  bubble_progress <- bubble_progress^0.75
+  
   animation_df$value_current <-
     animation_df$value_start +
     (animation_df$value_end - animation_df$value_start) * bubble_progress
   
   # Scale to sensible marker sizes
   animation_df$size_current <-
-    sqrt(animation_df$value_current) * 15
+    animation_df$value_current^3 * 600
+  
   
   animation_df$hover <- sprintf(
-    "<b>%s</b><br>Total Waste: %.3f<br>Per Capita: %.3f",
+    paste0(
+      "<b>%s</b><br>",
+      "Total waste: %s tonnes per year<br>",
+      "Waste per person: %.2f kg per person per day"
+    ),
     animation_df$country,
-    animation_df$value_start,
-    animation_df$value_end
+    format(
+      round(animation_df$tonnes_per_year),
+      big.mark = ","
+    ),
+    animation_df$kg_per_person_day
   )
   
   top_labels <- animation_df %>%
@@ -49,7 +61,7 @@ waste_animation_map <- function(animation_df, progress) {
       marker = list(
         size = animation_df$size_current,
         sizemode = "area",
-        sizeref = 2 * max_size / (80^2),
+        sizeref = 0.5,
         sizemin = 3,
         color = "#4E79A7",
         opacity = 0.8,
@@ -82,11 +94,13 @@ waste_animation_map <- function(animation_df, progress) {
         b = 0
       ),
       title = paste(
+        "Transition:",
         "Total Waste → Waste Per Person",
-        "|",
+        "(",
         round(progress * 100),
-        "%"
+        "% )"
       )
+      
     ) %>%
     config(
       displayModeBar = FALSE

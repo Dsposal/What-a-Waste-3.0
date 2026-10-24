@@ -124,7 +124,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$animateDorling, {
-    
+    print(input$animationSpeed)
     updateSliderInput(
       session,
       "animationProgress",
@@ -152,7 +152,16 @@ server <- function(input, output, session) {
       updateSliderInput(
         session,
         "animationProgress",
-        value = min(1, current + 0.04)
+        value = min(
+          1,
+          current + c(
+            0.005,  # Very Slow  (~10 seconds)
+            0.01,   # Slow       (~5 seconds)
+            0.02,   # Normal
+            0.03,   # Fast
+            0.05    # Very Fast
+          )[as.integer(input$animationSpeed)]
+        )
       )
       
     }
@@ -470,18 +479,42 @@ server <- function(input, output, session) {
       ) %>%
       filter(!is.na(value), value > 0)
     
+    combined_max <- max(
+      c(
+        world_tonnes$value,
+        world_per_capita$value
+      ),
+      na.rm = TRUE
+    )
+    
     animation_df <- data.frame(
       country = world_tonnes$name,
       iso3 = world_tonnes$adm0_a3,
       
+      tonnes_per_year = as.numeric(world_tonnes$value),
+      
+      kg_per_person_day = as.numeric(world_per_capita$value),
+      
       value_start =
-        world_tonnes$value /
-        max(world_tonnes$value),
+        percent_rank(world_tonnes$value),
       
       value_end =
-        world_per_capita$value /
-        max(world_per_capita$value)
+        percent_rank(world_per_capita$value)
     )
+    
+    animation_df$value_start <-
+      animation_df$value_start^3
+    
+    animation_df$value_end <-
+      animation_df$value_end^3
+    
+    
+    
+    summary(animation_df$value_start)
+    summary(animation_df$value_end)
+    
+    cat("Max start:", max(animation_df$value_start), "\n")
+    cat("Max end:", max(animation_df$value_end), "\n")
     
     waste_animation_map(
       animation_df = animation_df,
