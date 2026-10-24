@@ -558,13 +558,8 @@ server <- function(input, output, session) {
     ########################################################
     
     
-    
-    centres_tonnes <- st_coordinates(
-      st_centroid(dorling_tonnes)
-    )
-    
-    centres_capita <- st_coordinates(
-      st_centroid(dorling_per_capita)
+    map_centres <- st_coordinates(
+      st_centroid(world_msw_dorling)
     )
     
     top5_tonnes <- msw_tonnes %>%
@@ -577,10 +572,10 @@ server <- function(input, output, session) {
       head(5)
     
     animation_df <- data.frame(
-      country = dorling_tonnes$name,
-      iso3 = dorling_tonnes$adm0_a3,
-      x = centres_tonnes[,1],
-      y = centres_tonnes[,2],
+      country = world_msw_dorling$name,
+      iso3 = world_msw_dorling$adm0_a3,
+      x = map_centres[,1],
+      y = map_centres[,2],
       
       value_start =
         dorling_tonnes$value /
@@ -592,17 +587,34 @@ server <- function(input, output, session) {
     )
     
     progress <- animation_progress()
+  
+    if (progress < 0.1) {
+      
+      plot(
+        st_geometry(world_msw),
+        col = "lightgrey",
+        border = "white",
+        main = "Global Municipal Waste Generation (2030)"
+      )
+      
+      return()
+      
+    }
+    
+    bubble_progress <- max(
+      0,
+      min(
+        1,
+        (progress - 0.1) / 0.9
+      )
+    )
     
     animation_df$value_current <-
       animation_df$value_start +
-      (animation_df$value_end - animation_df$value_start) * progress
+      (animation_df$value_end - animation_df$value_start) * bubble_progress
     
     animation_df$radius_current <-
       animation_df$value_current * 3000000
-    
-    print(summary(animation_df$radius_current))
-    
-    summary(animation_df$radius_current)
     
     animation_df$fill_colour <- "lightgrey"
     
@@ -641,141 +653,7 @@ server <- function(input, output, session) {
       col = "black"
     )
     
-    return()
-    
-    ########################################################
-    # MOVEMENT ANALYSIS
-    #
-    # PURPOSE
-    # -------
-    # Quantify how far countries move between cartograms.
-    #
-    # Findings:
-    # - Countries can move substantial distances.
-    # - Small island states and microstates move most.
-    # - Animation should transition both position and size.
-    #
-    # This is currently diagnostic and not yet used for
-    # rendering.
-    ########################################################
-    
-    movement <- sqrt(
-      (centres_tonnes[,1] - centres_capita[,1])^2 +
-        (centres_tonnes[,2] - centres_capita[,2])^2
-    )
-    
-    movement_df <- data.frame(
-      country = dorling_tonnes$name,
-      distance = movement
-    ) %>%
-      arrange(desc(distance))
-    
-
-    
-    ########################################################
-    # CURRENT CARTOGRAM
-    #
-    # PURPOSE
-    # -------
-    # Generate the cartogram selected by the user and draw
-    # the current visualisation.
-    #
-    # NOTE
-    # ----
-    # This is separate from the animation research objects
-    # above and remains the cartogram currently displayed on
-    # screen.
-    ########################################################
-    
-    dorling <- cartogram_dorling(
-      world_msw_dorling,
-      weight = "value"
-    )
-    
-    dorling$group <- "Other"
-    
-    dorling$group[
-      dorling$adm0_a3 %in% top5_tonnes$map_code
-    ] <- "Tonnes"
-    
-    dorling$group[
-      dorling$adm0_a3 %in% top5_per_capita$map_code
-    ] <- "Per Capita"
-    
-    dorling$fill_colour <- case_when(
-      dorling$group == "Tonnes" ~ "#4E79A7",
-      dorling$group == "Per Capita" ~ "#F28E2B",
-      TRUE ~ "#D9D9D9"
-    )
-    
-    plot(
-      st_geometry(dorling),
-      col = dorling$fill_colour,
-      border = "black",
-      main = paste(
-        "Global Waste Generation Transition (2030)\n",
-        round(progress * 100),
-        "% Complete"
-      )
-    )
-    
-    legend(
-      "topright",
-      legend = c(
-        "Top 5 Total Waste (Tonnes)",
-        "Top 5 Waste Per Person",
-        "Other Countries"
-      ),
-      fill = c(
-        "#4E79A7",
-        "#F28E2B",
-        "#D9D9D9"
-      ),
-      bty = "n",
-      cex = 0.9
-    )
-    
-    top_labels <- dorling %>%
-      arrange(desc(value)) %>%
-      head(5)
-    
-    top_labels$name[top_labels$name == "United States of America"] <- "USA"
-    
-    coords <- st_coordinates(st_point_on_surface(top_labels))
-    
-    top5_tonnes_map <- dorling %>%
-      filter(adm0_a3 %in% top5_tonnes$map_code)
-    
-    top5_per_capita_map <- dorling %>%
-      filter(adm0_a3 %in% top5_per_capita$map_code)
-    
-    coords_tonnes <- st_coordinates(
-      st_point_on_surface(top5_tonnes_map)
-    )
-    
-    coords_per_capita <- st_coordinates(
-      st_point_on_surface(top5_per_capita_map)
-    )
-    
-    
-    text(
-      coords_tonnes[,1],
-      coords_tonnes[,2],
-      labels = top5_tonnes_map$name,
-      cex = 0.8,
-      col = "black"
-    )
-    
-    text(
-      coords_per_capita[,1],
-      coords_per_capita[,2],
-      labels = top5_per_capita_map$name,
-      cex = 0.8,
-      col = "black"
-    )
-    
   })
-  
   
   ############################################################
   # COUNTRY RACE
