@@ -20,11 +20,8 @@
 # R/geography.R
 # R/race.R
 # R/policy.R
-<<<<<<< HEAD
 # R/waste_flows.R
-=======
 # R/treatment_gap.R
->>>>>>> origin/feature/treatment-gap
 #
 # ui/home_tab.R
 # ui/data_explorer_tab.R
@@ -32,11 +29,9 @@
 # ui/cartogram_tab.R
 # ui/race_tab.R
 # ui/policy_tab.R
-<<<<<<< HEAD
 # ui/waste_flows_tab.R
-=======
 # ui/treatment_gap_tab.R
->>>>>>> origin/feature/treatment-gap
+
 #
 # AI NOTES
 # --------
@@ -70,11 +65,8 @@ source("R/lookups.R")
 source("R/geography.R")
 source("R/race.R")
 source("R/policy.R")
-<<<<<<< HEAD
 source("R/waste_flows.R")
-=======
 source("R/treatment_gap.R")
->>>>>>> origin/feature/treatment-gap
 
 # Then load tabs
 source("ui/home_tab.R")
@@ -83,11 +75,8 @@ source("ui/map_tab.R")
 source("ui/cartogram_tab.R")
 source("ui/race_tab.R")
 source("ui/policy_tab.R")
-<<<<<<< HEAD
 source("ui/waste_flows_tab.R")
-=======
 source("ui/treatment_gap_tab.R")
->>>>>>> origin/feature/treatment-gap
 
 
 # User Interface
@@ -103,13 +92,8 @@ ui <- fluidPage(
     cartogramTab,
     raceTab,
     policyTab,
-<<<<<<< HEAD
-    flowsTab
-
-=======
+    flowsTab,
     treatmentGapTab
-    
->>>>>>> origin/feature/treatment-gap
   )
   
 )
