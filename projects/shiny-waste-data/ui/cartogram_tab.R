@@ -29,7 +29,7 @@ cartogramTab <- tabPanel(
     "▶ Show Per-Capita View"
   ),
   
-  plotOutput(
+  plotlyOutput(
     "dorlingPlot",
     height = "700px"
   )
