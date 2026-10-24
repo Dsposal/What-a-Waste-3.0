@@ -3,7 +3,7 @@
 #
 # PURPOSE
 # -------
-# Data and charts for the "Policy" tab: each country's
+# Data and charts for the "EPR and treatment" tab: each country's
 # extended producer responsibility (EPR) status, and the
 # share of its waste sent to controlled facilities or
 # recycled, from its latest treatment survey.
@@ -81,8 +81,8 @@ epr_any <- epr_rows %>%
   filter(EV_CRITERIA_LABEL == "Existence") %>%
   pull(REF_AREA)
 
-# Shares from each country's latest treatment survey
-policy_treatment <- waw_text %>%
+# All treatment rows, one per country, year and type
+treatment_rows <- waw_text %>%
   filter(INDICATOR == "WM_MSW_TREAT") %>%
   pivot_longer(
     all_of(policy_years),
@@ -96,14 +96,66 @@ policy_treatment <- waw_text %>%
   ) %>%
   filter(!is.na(pct)) %>%
   group_by(REF_AREA, year) %>%
-  filter(sum(pct) > 0) %>%   # some latest surveys are all zeros
-  group_by(iso3 = REF_AREA) %>%
-  filter(year == max(year)) %>%
+  filter(sum(pct) > 0) %>%   # some surveys are all zeros
+  ungroup() %>%
+  select(iso3 = REF_AREA, year, type = TREATMENT_TYPE_LABEL, pct)
+
+# Pick one complete survey for a country. Some countries
+# report collected waste in one year and "Uncollected" in
+# another (Colombia: 86% in 2022, 14% uncollected in 2023),
+# so the latest year alone can be a fragment.
+#  1. Latest year, if it adds up to 90% or more.
+#  2. Otherwise the latest year plus the latest earlier year
+#     with different treatment types, if together they add
+#     up to 90-110%.
+#  3. Otherwise the latest year that adds up on its own.
+#  4. Otherwise none: the country has no complete survey.
+pick_survey <- function(rows) {
+
+  totals <- rows %>%
+    group_by(year) %>%
+    summarise(total = sum(pct), .groups = "drop") %>%
+    arrange(desc(year))
+
+  latest <- rows %>% filter(year == totals$year[1])
+  if (totals$total[1] >= 90) return(latest)
+
+  for (y in totals$year[-1]) {
+    other <- rows %>% filter(year == y)
+    if (any(other$type %in% latest$type)) next
+    combined <- bind_rows(latest, other)
+    if (between(sum(combined$pct), 90, 110)) return(combined)
+    break
+  }
+
+  complete <- totals %>% filter(total >= 90)
+  if (nrow(complete) > 0) return(rows %>% filter(year == complete$year[1]))
+
+  rows[0, ]
+
+}
+
+# One complete survey per country, one row per treatment
+# type. 'share' is the fraction of all MSW (the shares add
+# up to 1 per country). 'survey_year' is the year holding
+# most of the survey. Shared with other tabs.
+treatment_latest <- treatment_rows %>%
+  group_by(iso3) %>%
+  group_modify(~ pick_survey(.x)) %>%
+  mutate(
+    survey_year = first(year[which.max(ave(pct, year, FUN = sum))]),
+    share = pct / sum(pct)
+  ) %>%
+  ungroup() %>%
+  select(iso3, survey_year, type, share)
+
+policy_treatment <- treatment_latest %>%
+  group_by(iso3) %>%
   summarise(
-    survey_year = first(year),
-    controlled = 100 * sum(pct[TREATMENT_TYPE_LABEL %in% controlled_types]) / sum(pct),
-    recycling = if (any(TREATMENT_TYPE_LABEL == "Recycling")) {
-      100 * sum(pct[TREATMENT_TYPE_LABEL == "Recycling"]) / sum(pct)
+    survey_year = first(survey_year),
+    controlled = 100 * sum(share[type %in% controlled_types]),
+    recycling = if (any(type == "Recycling")) {
+      100 * sum(share[type == "Recycling"])
     } else {
       NA_real_
     },
