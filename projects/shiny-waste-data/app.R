@@ -107,19 +107,43 @@ server <- function(input, output, session) {
   
   animation_progress <- reactiveVal(0)
   
+  animation_running <- reactiveVal(FALSE)
+  
   observe({
     animation_progress(input$animationProgress)
   })
   
   observeEvent(input$animateDorling, {
     
-    animation_progress(0)
+    updateSliderInput(
+      session,
+      "animationProgress",
+      value = 0
+    )
     
-    for (i in 0:100) {
+    animation_running(TRUE)
+    
+  })
+  
+  observe({
+    
+    req(animation_running())
+    
+    invalidateLater(50)
+    
+    current <- input$animationProgress
+    
+    if (current >= 1) {
       
-      animation_progress(i / 100)
+      animation_running(FALSE)
       
-      Sys.sleep(0.05)
+    } else {
+      
+      updateSliderInput(
+        session,
+        "animationProgress",
+        value = min(1, current + 0.04)
+      )
       
     }
     
