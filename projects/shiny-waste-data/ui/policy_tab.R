@@ -7,9 +7,9 @@
 ############################################################
 
 policyTab <- tabPanel(
-  "Policy",
+  "EPR and treatment",
 
-  h3("EPR status and treatment performance"),
+  h3("Producer responsibility and waste treatment"),
 
   radioButtons(
     "policyMetric",
