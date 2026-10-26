@@ -4,10 +4,12 @@
 
 library(plotly)
 library(dplyr)
+library(scales)
+library(shiny)
 
 waste_animation_map <- function(animation_df, progress) {
   
-  print(progress)
+  # print(progress)
   
   # Bubble animation starts after 10%
   bubble_progress <- max(
@@ -18,11 +20,28 @@ waste_animation_map <- function(animation_df, progress) {
     )
   )
   
+  
   bubble_progress <- bubble_progress^0.75
   
   animation_df$value_current <-
     animation_df$value_start +
     (animation_df$value_end - animation_df$value_start) * bubble_progress
+  
+  sum(is.na(animation_df$value_current))
+  
+  colour_index <- round(
+    1 + (animation_df$value_current * 99)
+  )
+  
+  colour_index <- pmin(
+    100,
+    pmax(
+      1,
+      colour_index
+    )
+  )
+  
+  bubble_colour <- viridisLite::viridis(100)[colour_index]
   
   # Scale to sensible marker sizes
   animation_df$size_current <-
@@ -49,6 +68,8 @@ waste_animation_map <- function(animation_df, progress) {
   
   max_size <- max(animation_df$size_current, na.rm = TRUE)
   
+  
+  
   plot_geo() %>%
     add_trace(
       data = animation_df,
@@ -63,7 +84,7 @@ waste_animation_map <- function(animation_df, progress) {
         sizemode = "area",
         sizeref = 0.5,
         sizemin = 3,
-        color = "#4E79A7",
+        color = bubble_colour,
         opacity = 0.8,
         line = list(
           color = "white",
@@ -74,6 +95,8 @@ waste_animation_map <- function(animation_df, progress) {
     layout(
       showlegend = FALSE,
       geo = list(
+        fitbounds = "locations",
+        uirevision = "keep",
         showframe = FALSE,
         showcoastlines = FALSE,
         showcountries = TRUE,
@@ -105,5 +128,56 @@ waste_animation_map <- function(animation_df, progress) {
     config(
       displayModeBar = FALSE
     )
+
+  
+}
+
+waste_transition_legend <- function() {
+  
+  swatch <- function(colour) {
+    span(style = sprintf(
+      "display: inline-block; width: 12px; height: 12px;
+       margin-right: 6px; vertical-align: -1px;
+       background: %s; border-radius: 50%%;",
+      colour
+    ))
+  }
+  
+  div(
+    
+    strong("Bubble size"),
+    
+    div(
+      style = "margin-top: 6px;",
+      "Larger bubbles represent countries with greater prominence in the current view."
+    ),
+    
+    div(
+      style = "margin-top: 10px;",
+      strong("Bubble colour")
+    ),
+    
+    div(
+      swatch("#440154"),
+      "Lower ranking"
+    ),
+    
+    div(
+      swatch("#21908C"),
+      "Middle ranking"
+    ),
+    
+    div(
+      swatch("#FDE725"),
+      "Higher ranking"
+    ),
+    
+    div(
+      style = "margin-top: 8px;",
+      class = "text-muted",
+      "Yellow countries are the most prominent at each stage of the transition."
+    )
+    
+  )
   
 }

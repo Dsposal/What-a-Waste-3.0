@@ -433,6 +433,10 @@ server <- function(input, output, session) {
   # name joins or missing values.
   ############################################################
   
+  output$wasteTransitionLegend <- renderUI(
+    waste_transition_legend()
+  )
+  
   output$dorlingPlot <- renderPlotly({
     
     msw_tonnes <- waw_clean %>%
@@ -495,11 +499,8 @@ server <- function(input, output, session) {
       
       kg_per_person_day = as.numeric(world_per_capita$value),
       
-      value_start =
-        percent_rank(world_tonnes$value),
-      
-      value_end =
-        percent_rank(world_per_capita$value)
+      value_start <- percent_rank(world_tonnes$value) * 1.005,
+      value_end   <- percent_rank(world_per_capita$value) * 1.075
     )
     
     animation_df$value_start <-
@@ -508,13 +509,8 @@ server <- function(input, output, session) {
     animation_df$value_end <-
       animation_df$value_end^3
     
-    
-    
-    summary(animation_df$value_start)
-    summary(animation_df$value_end)
-    
-    cat("Max start:", max(animation_df$value_start), "\n")
-    cat("Max end:", max(animation_df$value_end), "\n")
+    #summary(animation_df$value_start)
+    #summary(animation_df$value_end)
     
     waste_animation_map(
       animation_df = animation_df,

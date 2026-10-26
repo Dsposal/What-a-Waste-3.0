@@ -38,9 +38,26 @@ cartogramTab <- tabPanel(
     "▶ Play Animation"
   ),
   
-  plotlyOutput(
-    "dorlingPlot",
-    height = "700px"
+  div(
+    style = "position: relative;",
+    
+    plotlyOutput(
+      "dorlingPlot",
+      height = "calc(100vh - 250px)"
+    ),
+    
+    div(
+      style = paste(
+        "position: absolute; left: 8px; bottom: 8px; z-index: 10;",
+        "background: rgba(255,255,255,0.92);",
+        "padding: 10px 12px;",
+        "border: 1px solid #e1e0d9;",
+        "border-radius: 6px;",
+        "font-size: 12px;"
+      ),
+      
+      uiOutput("wasteTransitionLegend")
+    )
   )
   
 )
