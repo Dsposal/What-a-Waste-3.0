@@ -95,7 +95,6 @@ waste_animation_map <- function(animation_df, progress) {
     layout(
       showlegend = FALSE,
       geo = list(
-        fitbounds = "locations",
         uirevision = "keep",
         showframe = FALSE,
         showcoastlines = FALSE,
