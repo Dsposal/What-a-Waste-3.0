@@ -7,11 +7,9 @@ library(dplyr)
 library(scales)
 library(shiny)
 
-waste_animation_map <- function(animation_df, progress) {
+waste_animation_frame <- function(animation_df, progress) {
   
-  # print(progress)
-  
-  # Bubble animation starts after 10%
+  # Bubble animation starts after 10%.
   bubble_progress <- max(
     0,
     min(
@@ -22,12 +20,10 @@ waste_animation_map <- function(animation_df, progress) {
   
   
   bubble_progress <- bubble_progress^0.75
-  
+
   animation_df$value_current <-
     animation_df$value_start +
     (animation_df$value_end - animation_df$value_start) * bubble_progress
-  
-  sum(is.na(animation_df$value_current))
   
   colour_index <- round(
     1 + (animation_df$value_current * 99)
@@ -43,11 +39,26 @@ waste_animation_map <- function(animation_df, progress) {
   
   bubble_colour <- viridisLite::viridis(100)[colour_index]
   
-  # Scale to sensible marker sizes
-  animation_df$size_current <-
-    animation_df$value_current^3 * 600
-  
-  
+  animation_df$size_current <- animation_df$value_current^3 * 600
+  animation_df$colour_current <- bubble_colour
+
+  animation_df
+}
+
+waste_animation_title <- function(progress) {
+  paste(
+    "Transition:",
+    "Total Waste → Waste Per Person",
+    "(",
+    round(progress * 100),
+    "% )"
+  )
+}
+
+waste_animation_map <- function(animation_df, progress) {
+
+  animation_df <- waste_animation_frame(animation_df, progress)
+
   animation_df$hover <- sprintf(
     paste0(
       "<b>%s</b><br>",
@@ -61,12 +72,6 @@ waste_animation_map <- function(animation_df, progress) {
     ),
     animation_df$kg_per_person_day
   )
-  
-  top_labels <- animation_df %>%
-    arrange(desc(value_current)) %>%
-    head(10)
-  
-  max_size <- max(animation_df$size_current, na.rm = TRUE)
   
   fallback_rows <- !is.na(animation_df$lon) &
     !is.na(animation_df$lat)
@@ -86,7 +91,7 @@ waste_animation_map <- function(animation_df, progress) {
         sizemode = "area",
         sizeref = 0.5,
         sizemin = 3,
-        color = bubble_colour[iso_rows],
+        color = animation_df$colour_current[iso_rows],
         opacity = 0.8,
         line = list(
           color = "white",
@@ -110,7 +115,7 @@ waste_animation_map <- function(animation_df, progress) {
           sizemode = "area",
           sizeref = 0.5,
           sizemin = 3,
-          color = bubble_colour[fallback_rows],
+          color = animation_df$colour_current[fallback_rows],
           opacity = 0.8,
           line = list(
             color = "white",
@@ -144,13 +149,7 @@ waste_animation_map <- function(animation_df, progress) {
         t = 40,
         b = 0
       ),
-      title = paste(
-        "Transition:",
-        "Total Waste → Waste Per Person",
-        "(",
-        round(progress * 100),
-        "% )"
-      )
+      title = waste_animation_title(progress)
       
     ) %>%
     config(

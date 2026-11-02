@@ -437,7 +437,7 @@ server <- function(input, output, session) {
     waste_transition_legend()
   )
   
-  output$dorlingPlot <- renderPlotly({
+  transition_data <- reactive({
     
     msw_tonnes <- waw_clean %>%
       filter(
@@ -512,16 +512,46 @@ server <- function(input, output, session) {
     
     animation_df$value_end <-
       animation_df$value_end^3
-    
-    #summary(animation_df$value_start)
-    #summary(animation_df$value_end)
-    
-    waste_animation_map(
-      animation_df = animation_df,
-      progress = animation_progress()
-    )
-    
+
+    animation_df
   })
+
+  output$dorlingPlot <- renderPlotly({
+    waste_animation_map(
+      animation_df = transition_data(),
+      progress = 0
+    )
+  })
+
+  observeEvent(animation_progress(), {
+    progress <- animation_progress()
+    frame <- waste_animation_frame(transition_data(), progress)
+
+    fallback_rows <- !is.na(frame$lon) & !is.na(frame$lat)
+    trace_rows <- list(!fallback_rows)
+    if (any(fallback_rows)) {
+      trace_rows <- c(trace_rows, list(fallback_rows))
+    }
+
+    proxy <- plotlyProxy("dorlingPlot", session)
+    for (trace_index in seq_along(trace_rows)) {
+      rows <- trace_rows[[trace_index]]
+      plotlyProxyInvoke(
+        proxy,
+        "restyle",
+        list(
+          "marker.size" = list(frame$size_current[rows]),
+          "marker.color" = list(frame$colour_current[rows])
+        ),
+        list(trace_index - 1)
+      )
+    }
+    plotlyProxyInvoke(
+      proxy,
+      "relayout",
+      list(title = waste_animation_title(progress))
+    )
+  }, ignoreInit = TRUE)
   
   ############################################################
   # COUNTRY RACE
