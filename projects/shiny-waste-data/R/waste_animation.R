@@ -39,7 +39,7 @@ waste_animation_frame <- function(animation_df, progress) {
   
   bubble_colour <- viridisLite::viridis(100)[colour_index]
   
-  animation_df$size_current <- animation_df$value_current^3 * 600
+  animation_df$size_current <- pmax(3, animation_df$value_current^2 * 600)
   animation_df$colour_current <- bubble_colour
 
   animation_df
