@@ -501,7 +501,11 @@ server <- function(input, output, session) {
       
       value_start <- percent_rank(world_tonnes$value) * 1.005,
       value_end   <- percent_rank(world_per_capita$value) * 1.075
-    )
+    ) %>%
+      left_join(
+        plotly_geo_fallback_coords,
+        by = "iso3"
+      )
     
     animation_df$value_start <-
       animation_df$value_start^3

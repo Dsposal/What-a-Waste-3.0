@@ -68,11 +68,13 @@ waste_animation_map <- function(animation_df, progress) {
   
   max_size <- max(animation_df$size_current, na.rm = TRUE)
   
-  
-  
-  plot_geo() %>%
+  fallback_rows <- !is.na(animation_df$lon) &
+    !is.na(animation_df$lat)
+  iso_rows <- !fallback_rows
+
+  p <- plot_geo() %>%
     add_trace(
-      data = animation_df,
+      data = animation_df[iso_rows, , drop = FALSE],
       type = "scattergeo",
       mode = "markers",
       locations = ~iso3,
@@ -80,18 +82,45 @@ waste_animation_map <- function(animation_df, progress) {
       hoverinfo = "text",
       text = ~hover,
       marker = list(
-        size = animation_df$size_current,
+        size = animation_df$size_current[iso_rows],
         sizemode = "area",
         sizeref = 0.5,
         sizemin = 3,
-        color = bubble_colour,
+        color = bubble_colour[iso_rows],
         opacity = 0.8,
         line = list(
           color = "white",
           width = 1
         )
       )
-    ) %>%
+    )
+
+  if (any(fallback_rows)) {
+    p <- p %>%
+      add_trace(
+        data = animation_df[fallback_rows, , drop = FALSE],
+        type = "scattergeo",
+        mode = "markers",
+        lon = ~lon,
+        lat = ~lat,
+        hoverinfo = "text",
+        text = ~hover,
+        marker = list(
+          size = animation_df$size_current[fallback_rows],
+          sizemode = "area",
+          sizeref = 0.5,
+          sizemin = 3,
+          color = bubble_colour[fallback_rows],
+          opacity = 0.8,
+          line = list(
+            color = "white",
+            width = 1
+          )
+        )
+      )
+  }
+
+  p %>%
     layout(
       showlegend = FALSE,
       geo = list(
