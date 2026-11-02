@@ -124,7 +124,6 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$animateDorling, {
-    print(input$animationSpeed)
     updateSliderInput(
       session,
       "animationProgress",
@@ -469,49 +468,34 @@ server <- function(input, output, session) {
         .groups = "drop"
       )
     
-    world_tonnes <- world %>%
+    animation_df <- world %>%
+      st_drop_geometry() %>%
       left_join(
-        msw_tonnes,
+        msw_tonnes %>% rename(tonnes_per_year = value),
         by = c("adm0_a3" = "map_code")
       ) %>%
-      filter(!is.na(value), value > 0)
-    
-    world_per_capita <- world %>%
       left_join(
-        msw_per_capita,
+        msw_per_capita %>% rename(kg_per_person_day = value),
         by = c("adm0_a3" = "map_code")
       ) %>%
-      filter(!is.na(value), value > 0)
-    
-    combined_max <- max(
-      c(
-        world_tonnes$value,
-        world_per_capita$value
-      ),
-      na.rm = TRUE
-    )
-    
-    animation_df <- data.frame(
-      country = world_tonnes$name,
-      iso3 = world_tonnes$adm0_a3,
-      
-      tonnes_per_year = as.numeric(world_tonnes$value),
-      
-      kg_per_person_day = as.numeric(world_per_capita$value),
-      
-      value_start <- percent_rank(world_tonnes$value) * 1.005,
-      value_end   <- percent_rank(world_per_capita$value) * 1.075
-    ) %>%
+      filter(
+        !is.na(tonnes_per_year),
+        tonnes_per_year > 0,
+        !is.na(kg_per_person_day),
+        kg_per_person_day > 0
+      ) %>%
+      transmute(
+        country = name,
+        iso3 = adm0_a3,
+        tonnes_per_year = as.numeric(tonnes_per_year),
+        kg_per_person_day = as.numeric(kg_per_person_day),
+        value_start = percent_rank(tonnes_per_year),
+        value_end = percent_rank(kg_per_person_day)
+      ) %>%
       left_join(
         plotly_geo_fallback_coords,
         by = "iso3"
       )
-    
-    animation_df$value_start <-
-      animation_df$value_start^3
-    
-    animation_df$value_end <-
-      animation_df$value_end^3
 
     animation_df
   })
@@ -534,22 +518,21 @@ server <- function(input, output, session) {
     }
 
     proxy <- plotlyProxy("dorlingPlot", session)
-    for (trace_index in seq_along(trace_rows)) {
-      rows <- trace_rows[[trace_index]]
-      plotlyProxyInvoke(
-        proxy,
-        "restyle",
-        list(
-          "marker.size" = list(frame$size_current[rows]),
-          "marker.color" = list(frame$colour_current[rows])
-        ),
-        list(trace_index - 1)
-      )
-    }
     plotlyProxyInvoke(
       proxy,
-      "relayout",
-      list(title = waste_animation_title(progress))
+      "update",
+      list(
+        "marker.size" = lapply(
+          trace_rows,
+          function(rows) frame$size_current[rows]
+        ),
+        "marker.color" = lapply(
+          trace_rows,
+          function(rows) frame$colour_current[rows]
+        )
+      ),
+      list(title = waste_animation_title(progress)),
+      as.list(seq_along(trace_rows) - 1)
     )
   }, ignoreInit = TRUE)
   
