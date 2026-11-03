@@ -1,14 +1,25 @@
 cartogramTab <- tabPanel(
   "Waste Transition",
   
-  h2("From Total Waste to Waste Per Person"),
+  h2("From Waste Amounts to Waste per Person"),
   
   p(
     class = "text-muted",
-    "This animation shows how the global picture changes when waste is viewed from two different perspectives. ",
-    "At the start, bubble size represents each country's total municipal waste generation (tonnes per year). ",
-    "As the animation progresses, bubbles transition to represent waste generation per person (kilograms per person per day). ",
+    "This animation compares waste amounts across countries in tonnes per year and kilograms per person per day. ",
+    "For an individual material, those amounts are estimates derived from its MSW composition share. ",
+    "Bubble sizes transition from ranking the selected waste amount in tonnes to ranking it per person. ",
     "Countries that shrink produce large volumes of waste mainly because of their population size, while countries that grow generate comparatively more waste per person."
+  ),
+
+  selectInput(
+    "animationWasteType",
+    "Waste type",
+    choices = waste_animation_choices(waw_clean)
+  ),
+
+  p(
+    class = "small text-muted",
+    "For an individual material, both measures are estimates: the latest reported MSW composition share is applied to 2030 MSW generation. This assumes the reported share still represents the 2030 waste mix; hover over a country to see the share and its reporting year."
   ),
   
   sliderInput(
