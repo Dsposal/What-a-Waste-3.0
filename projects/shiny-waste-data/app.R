@@ -67,6 +67,7 @@ source("R/race.R")
 source("R/policy.R")
 source("R/waste_flows.R")
 source("R/treatment_gap.R")
+source("R/waste_animation.R")
 
 # Then load tabs
 source("ui/home_tab.R")
@@ -437,73 +438,17 @@ server <- function(input, output, session) {
   )
   
   transition_data <- reactive({
-    
-    msw_tonnes <- waw_clean %>%
-      filter(
-        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-        UNIT_MEASURE_LABEL == "Tonnes per year"
-      ) %>%
-      mutate(
-        value = as.numeric(`2030`)
-      ) %>%
-      filter(!is.na(value)) %>%
-      group_by(map_code) %>%
-      summarise(
-        value = first(na.omit(value)),
-        .groups = "drop"
-      )
-    
-    msw_per_capita <- waw_clean %>%
-      filter(
-        INDICATOR_LABEL == "Municipal Solid Waste (MSW) Generation",
-        UNIT_MEASURE_LABEL == "Kilograms per person per day"
-      ) %>%
-      mutate(
-        value = as.numeric(`2030`)
-      ) %>%
-      filter(!is.na(value)) %>%
-      group_by(map_code) %>%
-      summarise(
-        value = first(na.omit(value)),
-        .groups = "drop"
-      )
-    
-    animation_df <- world %>%
-      st_drop_geometry() %>%
-      left_join(
-        msw_tonnes %>% rename(tonnes_per_year = value),
-        by = c("adm0_a3" = "map_code")
-      ) %>%
-      left_join(
-        msw_per_capita %>% rename(kg_per_person_day = value),
-        by = c("adm0_a3" = "map_code")
-      ) %>%
-      filter(
-        !is.na(tonnes_per_year),
-        tonnes_per_year > 0,
-        !is.na(kg_per_person_day),
-        kg_per_person_day > 0
-      ) %>%
-      transmute(
-        country = name,
-        iso3 = adm0_a3,
-        tonnes_per_year = as.numeric(tonnes_per_year),
-        kg_per_person_day = as.numeric(kg_per_person_day),
-        value_start = percent_rank(tonnes_per_year),
-        value_end = percent_rank(kg_per_person_day)
-      ) %>%
-      left_join(
-        plotly_geo_fallback_coords,
-        by = "iso3"
-      )
-
-    animation_df
+    waste_animation_data(
+      waw_data = waw_clean,
+      world = world,
+      waste_type = input$animationWasteType
+    )
   })
 
   output$dorlingPlot <- renderPlotly({
     waste_animation_map(
       animation_df = transition_data(),
-      progress = 0
+      progress = isolate(animation_progress())
     )
   })
 
@@ -531,7 +476,11 @@ server <- function(input, output, session) {
           function(rows) frame$colour_current[rows]
         )
       ),
-      list(title = waste_animation_title(progress)),
+      list(title = waste_animation_title(
+        progress,
+        frame$waste_type_label[[1]],
+        frame$is_estimate[[1]]
+      )),
       as.list(seq_along(trace_rows) - 1)
     )
   }, ignoreInit = TRUE)
