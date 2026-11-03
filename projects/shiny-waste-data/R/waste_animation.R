@@ -201,7 +201,10 @@ waste_animation_frame <- function(animation_df, progress) {
   
   bubble_colour <- viridisLite::viridis(100)[colour_index]
   
-  animation_df$size_current <- pmax(3, animation_df$value_current^2 * 600)
+  animation_df$size_current <- pmax(
+    3,
+    2 * animation_df$value_current * sqrt(600)
+  )
   animation_df$colour_current <- bubble_colour
 
   animation_df
@@ -280,8 +283,8 @@ waste_animation_map <- function(animation_df, progress) {
       text = ~hover,
       marker = list(
         size = animation_df$size_current[iso_rows],
-        sizemode = "area",
-        sizeref = 0.5,
+        sizemode = "diameter",
+        sizeref = 1,
         sizemin = 3,
         color = animation_df$colour_current[iso_rows],
         opacity = 0.8,
@@ -304,8 +307,8 @@ waste_animation_map <- function(animation_df, progress) {
         text = ~hover,
         marker = list(
           size = animation_df$size_current[fallback_rows],
-          sizemode = "area",
-          sizeref = 0.5,
+          sizemode = "diameter",
+          sizeref = 1,
           sizemin = 3,
           color = animation_df$colour_current[fallback_rows],
           opacity = 0.8,
