@@ -1,3 +1,5 @@
+# Controls for the country-level MSW generation map.
+# Scale options change how values are coloured, not the underlying data.
 mapTab <- tabPanel(
 
   "Map",

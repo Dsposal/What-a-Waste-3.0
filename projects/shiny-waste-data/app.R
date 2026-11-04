@@ -136,7 +136,6 @@ server <- function(input, output, session) {
   })
   
   observe({
-    
     req(animation_running())
     
     invalidateLater(50)
@@ -228,6 +227,8 @@ server <- function(input, output, session) {
     trusted_points <- filtered_msw() %>%
       filter(Year %in% c(2022, 2030, 2040, 2050))
 
+    # This straight-line guide uses the four supplied milestone values. It
+    # is a simple visual aid, not a second official projection series.
     forecast_model <- lm(
       Value ~ Year,
       data = trusted_points
@@ -452,10 +453,14 @@ server <- function(input, output, session) {
     )
   })
 
+  # Update the existing Plotly traces as the slider moves rather than
+  # rebuilding the full map for every animation frame.
   observeEvent(animation_progress(), {
     progress <- animation_progress()
     frame <- waste_animation_frame(transition_data(), progress)
 
+    # Fallback countries use explicit lon/lat in a second trace; keep the
+    # row masks in the same order as the traces created by waste_animation_map().
     fallback_rows <- !is.na(frame$lon) & !is.na(frame$lat)
     trace_rows <- list(!fallback_rows)
     if (any(fallback_rows)) {

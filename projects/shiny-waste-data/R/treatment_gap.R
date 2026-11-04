@@ -17,8 +17,8 @@
 # AI NOTES
 # --------
 # Builds on R/policy.R (treatment_latest, controlled_types,
-# policy_countries). Shiny loads R/ files in alphabetical
-# order, so this file must sort after policy.R.
+# policy_countries). app.R explicitly sources policy.R before
+# this file; preserve that order if changing the source list.
 #
 # "If nothing changes" means today's shares applied to the
 # extra tonnes: a scenario, not a forecast.

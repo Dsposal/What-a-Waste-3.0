@@ -1,3 +1,6 @@
+# Controls and outputs for the country/global time-series view.
+# The selected area is processed in app.R; its dashed linear guide is a
+# simple visualization based on the dataset's projection milestones.
 dataExplorerTab <- tabPanel(
     "Data Explorer",
     

@@ -10,8 +10,8 @@
 # AI NOTES
 # --------
 # Builds on R/policy.R (treatment_latest, policy_countries).
-# Shiny loads R/ files in alphabetical order, so this file
-# must sort after policy.R.
+# app.R explicitly sources policy.R before this file;
+# preserve that order if changing the source list.
 #
 # Treatment shares are a percentage of ALL MSW, and include
 # "Uncollected" and "Unaccounted for", so one survey covers
@@ -232,4 +232,3 @@ flow_sankey <- function(year, measure, group = "All", iso = "All") {
     event_register("plotly_click")
 
 }
-
