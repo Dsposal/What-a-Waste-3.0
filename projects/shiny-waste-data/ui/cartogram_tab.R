@@ -1,3 +1,6 @@
+# Controls and explanatory copy for the Waste Transition animation.
+# The animation and material-estimate calculations are implemented in
+# R/waste_animation.R; keep the estimate caveat visible when adding controls.
 cartogramTab <- tabPanel(
   "Waste Transition",
   

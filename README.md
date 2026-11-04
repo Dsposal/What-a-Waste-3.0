@@ -60,7 +60,18 @@ These are only suggestions. The most exciting projects are often the ones nobody
 ## Repository Structure
 
 ```text
-/docs          Project documentation
 /data          Shared datasets and references
-/projects      Team project folders
+/projects      Hackathon project folders
 /resources     Supporting materials
+```
+
+## Explore a project
+
+The [Shiny Waste Data project](projects/shiny-waste-data/README.md) is an
+interactive R Shiny prototype for exploring the What a Waste 3.0 data. Try
+the [live demo](https://what-a-waste.shinyapps.io/shiny-waste-data/), run it
+locally, or jump into the code and experiment. It is a hackathon project:
+questions, small improvements, and clearly documented explorations are
+welcome. Its README explains how to get started and its
+[AI contribution guidance](projects/shiny-waste-data/llms.txt) explains how
+AI assistants can help with that project.

@@ -1,0 +1,33 @@
+# AI contribution guidance: Shiny Waste Data
+
+> This guidance applies only to `projects/shiny-waste-data/`. It does not define requirements for other repository projects, which have their own scope and maintainers.
+
+This is a hackathon prototype: help people explore, ask questions, and try ideas. Prefer welcoming, understandable changes over unnecessary complexity; document what an experiment shows and what it does not show.
+
+## Contributing to this project
+
+- Work on a dedicated, descriptive branch and submit changes as a pull request for human review. Do not commit directly to the default branch or merge your own pull request.
+- Keep changes focused. Explain the purpose, important trade-offs, and relevant verification in the pull request.
+- Documentation is king: keep this project's README current, and document important behavior, data interpretation, assumptions, and steps needed to run or reproduce changes alongside the code.
+- Keep project changes within this directory unless a requested change clearly requires repository-level work. Follow the existing R Shiny structure: `app.R`, `ui/`, and `R/`. `app.R` explicitly sources these files; preserve dependency order when adding or moving a helper.
+- Ask the project maintainer when requirements or data interpretations are unclear; do not silently make consequential assumptions.
+
+## Data and interpretation
+
+- Record data sources, versions or dates, licensing, coverage, units, and transformations. Preserve source data and make derived data reproducible.
+- Distinguish directly reported values from estimates. State assumptions, missingness, comparability limits, and other material caveats; do not present correlation as causation.
+- In the Waste Transition view, material composition values are percentages of MSW. Applying a reported share to projected 2030 MSW generation produces an exploratory estimate, not a directly reported material projection; explain the assumption that composition remains representative.
+- Avoid adding large files, credentials, or private information. Do not include deployment-generated changes unless necessary and explained.
+
+## Code and verification
+
+- Read the [project README](README.md) before changing behavior and preserve existing behavior outside the requested change.
+- Treat reported observations, projections, interpolations, and scenario estimates as different things. Do not describe a visualization or association as causal evidence.
+- Run relevant checks using the project's available setup. Report what passed, failed, or could not be run; do not claim checks that were not performed.
+
+## Project references
+
+- [Project overview and current data caveats](README.md)
+- [Shiny application](app.R)
+- [UI modules](ui/)
+- [Analysis and data modules](R/)

@@ -1,5 +1,21 @@
 ############################################################
-# WASTE ANIMATION MAP
+# WASTE TRANSITION ANIMATION
+#
+# PURPOSE
+# -------
+# Prepare country-level total or estimated material values
+# and render the animated transition from total tonnes to
+# per-person rankings.
+#
+# DATA NOTE
+# ---------
+# Material values are estimates: each country's latest
+# reported composition share is applied to its 2030 MSW
+# projections. This is not a reported material projection.
+#
+# USED BY
+# -------
+# ui/cartogram_tab.R and the matching server logic in app.R.
 ############################################################
 
 library(plotly)
@@ -81,6 +97,8 @@ waste_animation_data <- function(waw_data, world, waste_type = "total") {
       stop("No MSW composition data found for waste type: ", waste_type)
     }
 
+    # Keep the latest valid observation by year; this is still a reported
+    # historical share, not a composition value observed in the 2030 projection.
     composition <- waw_data %>%
       filter(
         INDICATOR == "WM_MSW_COMP",
@@ -115,6 +133,8 @@ waste_animation_data <- function(waw_data, world, waste_type = "total") {
 
     animation_df <- animation_df %>%
       left_join(composition, by = c("adm0_a3" = "map_code")) %>%
+      # Composition shares are percentages of MSW; apply the same fraction
+      # to both projected total-waste measures.
       mutate(
         tonnes_per_year = tonnes_per_year * composition_share_pct / 100,
         kg_per_person_day = kg_per_person_day * composition_share_pct / 100
@@ -159,6 +179,8 @@ waste_animation_data <- function(waw_data, world, waste_type = "total") {
       composition_year = if (is_estimate) composition_year else NA_integer_,
       waste_type_label = waste_type_label,
       is_estimate = is_estimate,
+      # Compare each country by rank at each end of the animation, rather
+      # than interpolating between unlike units (tonnes and kg/person/day).
       value_start = percent_rank(tonnes_per_year),
       value_end = percent_rank(kg_per_person_day)
     ) %>%
@@ -171,7 +193,8 @@ waste_animation_data <- function(waw_data, world, waste_type = "total") {
 
 waste_animation_frame <- function(animation_df, progress) {
   
-  # Bubble animation starts after 10%.
+  # Delay the bubbles for the first 10% of the slider, then ease their
+  # rank-based size and colour toward the per-person ranking.
   bubble_progress <- max(
     0,
     min(
